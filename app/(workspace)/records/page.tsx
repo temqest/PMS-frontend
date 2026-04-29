@@ -318,7 +318,7 @@ export default function RecordsPage() {
                   key={patient.id}
                   className="cursor-pointer border-b border-[#F3F4F6] hover:bg-[#FAFBFC]"
                   onClick={() => {
-                    router.push(`/patients/${encodeURIComponent(patient.id)}`);
+                    void selectPatient(patient);
                   }}
                 >
                   <td className="px-4 py-4">
