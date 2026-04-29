@@ -21,7 +21,7 @@ type PatientData = {
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
-  sex?: "Male" | "Female" | "Non-binary" | "Prefer not to say";
+  sex?: "Male" | "Female" | "Other";
   phone?: string;
   email?: string;
   // Secondary info
@@ -451,8 +451,7 @@ export default function PatientModal({
                         <option value="">Select sex</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
-                        <option value="Non-binary">Non-binary</option>
-                        <option value="Prefer not to say">Prefer not to say</option>
+                        <option value="Other">Other</option>
                       </select>
                       <ChevronDown
                         size={12}

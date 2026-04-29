@@ -2,9 +2,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_
 
 function authHeader() {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('pms_token') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch {
+    if (typeof window === 'undefined') {
+      return {};
+    }
+    const token = localStorage.getItem('pms_token');
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
+  } catch (e) {
+    console.error('Error retrieving auth token:', e);
     return {};
   }
 }
@@ -13,7 +20,10 @@ async function request(path: string, opts: RequestInit = {}) {
   const headers = Object.assign({ 'Content-Type': 'application/json' }, authHeader(), opts.headers || {});
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw body;
+  if (!res.ok) {
+    console.error('API Error Response:', { status: res.status, path, body, headers });
+    throw body;
+  }
   // apiResponse.success wraps payload under `data` so return that if present
   return body.token || body.data || body;
 }

@@ -29,11 +29,14 @@ export default function LoginPage() {
       const token = data.token || (data.data && data.data.token);
       if (token) {
         localStorage.setItem("pms_token", token);
+        console.log("Token stored successfully in localStorage");
         router.push("/dashboard");
       } else {
+        console.error("No token in response:", data);
         throw new Error("No token received");
       }
     } catch (e: any) {
+      console.error("Login error:", e);
       setError(e.message || "An error occurred");
     } finally {
       setLoading(false);

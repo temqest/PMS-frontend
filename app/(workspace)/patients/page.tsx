@@ -224,7 +224,7 @@ export default function PatientsPage() {
               first_name: form.firstName,
               last_name: form.lastName,
               date_of_birth: form.dateOfBirth,
-              gender: form.sex === 'Prefer not to say' ? 'Other' : form.sex,
+              gender: form.sex,
               contact_number: form.phone,
               email_address: form.email,
               address: [form.street, form.city, form.state, form.zip].filter(Boolean).join(', '),
