@@ -1,0 +1,882 @@
+/* Prescription Modal - Complete Fresh Build */
+/* Design: Pure white primary, sage green accent (#6B9080), Inter font, thin-line icons */
+
+/* ===== BACKDROP ===== */
+.prescription-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  animation: prescriptionBackdropEnter 200ms ease-out forwards;
+}
+
+@keyframes prescriptionBackdropEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===== CONTAINER & CARD ===== */
+.prescription-modal-container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  padding: 24px;
+}
+
+.prescription-modal-card {
+  pointer-events: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  border: none;
+  outline: none;
+  animation: prescriptionCardEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+@keyframes prescriptionCardEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ===== SUCCESS STATE ===== */
+.prescription-success-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 32px;
+  text-align: center;
+  gap: 20px;
+}
+
+.prescription-success-icon {
+  color: #6b9080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prescription-success-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.prescription-success-summary {
+  font-size: 15px;
+  font-weight: 400;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.prescription-btn-done {
+  height: 44px;
+  padding: 0 28px;
+  border-radius: 10px;
+  background: #6b9080;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  margin-top: 12px;
+}
+
+.prescription-btn-done:hover {
+  background: #5a7d6d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(107, 144, 128, 0.3);
+}
+
+.prescription-btn-done:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===== HEADER ===== */
+.prescription-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 32px 32px 0 32px;
+  padding-bottom: 0;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .prescription-header {
+    padding: 24px 24px 0 24px;
+    margin-bottom: 12px;
+  }
+}
+
+.prescription-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.prescription-icon-circle {
+  width: 44px;
+  height: 44px;
+  background: rgba(107, 144, 128, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b9080;
+  flex-shrink: 0;
+}
+
+.prescription-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.prescription-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.prescription-header-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.prescription-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.prescription-close-btn:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* ===== RENEW BANNER ===== */
+.prescription-renew-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 32px;
+  background: rgba(168, 162, 158, 0.08);
+  border-left: 3px solid #a8a29e;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.prescription-renew-title {
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.prescription-renew-text {
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* ===== FORM BODY ===== */
+.prescription-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  padding: 32px;
+  padding-bottom: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+}
+
+.prescription-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.prescription-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prescription-form::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+.prescription-form::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+@media (max-width: 639px) {
+  .prescription-form {
+    padding: 24px;
+    padding-bottom: 0;
+  }
+}
+
+/* ===== SECTION HEADERS ===== */
+.prescription-section-header {
+  margin: 0;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.prescription-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== FIELDS ===== */
+.prescription-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prescription-field-full {
+  grid-column: 1 / -1;
+}
+
+.prescription-field-row {
+  display: grid;
+  gap: 16px;
+}
+
+.prescription-field-row-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 639px) {
+  .prescription-field-row-2 {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* ===== LABELS ===== */
+.prescription-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin: 0;
+  display: block;
+}
+
+/* ===== INPUT FIELDS ===== */
+.prescription-input {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  transition: all 200ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.prescription-input::placeholder {
+  color: #a1a1aa;
+}
+
+.prescription-input:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.prescription-input-error {
+  border-color: #ef4444;
+}
+
+.prescription-input-error:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08);
+}
+
+.prescription-input-changed {
+  border-left: 3px solid #6b9080;
+}
+
+/* ===== MEDICATION SEARCH ===== */
+.prescription-medication-wrapper {
+  position: relative;
+}
+
+.prescription-medication-suggestions {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.prescription-suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: #27272a;
+  font-size: 14px;
+  transition: all 100ms ease;
+}
+
+.prescription-suggestion-item:hover {
+  background: #f9fafb;
+}
+
+.prescription-suggestion-item svg {
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+
+/* ===== PATIENT CHIP ===== */
+.prescription-patient-chip-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.prescription-patient-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 12px;
+  height: 36px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.prescription-patient-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #6b9080;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.prescription-patient-change {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b9080;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 150ms ease;
+}
+
+.prescription-patient-change:hover {
+  color: #5a7d6d;
+  text-decoration: underline;
+}
+
+/* ===== DATE INPUT ===== */
+.prescription-date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prescription-date-input-wrapper input[type="date"] {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.prescription-date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.prescription-input-icon-right {
+  position: absolute;
+  right: 14px;
+  color: #a1a1aa;
+  pointer-events: none;
+}
+
+/* ===== SELECT DROPDOWNS ===== */
+.prescription-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prescription-select {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  cursor: pointer;
+  transition: all 200ms ease;
+  appearance: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  padding-right: 40px;
+}
+
+.prescription-select:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.prescription-select-caret {
+  position: absolute;
+  right: 14px;
+  color: #a1a1aa;
+  pointer-events: none;
+}
+
+/* ===== ERROR MESSAGES ===== */
+.prescription-error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+/* ===== TEXTAREA ===== */
+.prescription-textarea {
+  min-height: 100px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  resize: vertical;
+  transition: all 200ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.prescription-textarea::placeholder {
+  color: #a1a1aa;
+}
+
+.prescription-textarea:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.prescription-textarea.prescription-input-changed {
+  border-left: 3px solid #6b9080;
+}
+
+.prescription-textarea.prescription-input-error {
+  border-color: #ef4444;
+}
+
+.prescription-textarea.prescription-input-error:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08);
+}
+
+/* ===== TOGGLE ===== */
+.prescription-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.prescription-toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 28px;
+  background: #e5e7eb;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 200ms ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.prescription-toggle.on {
+  background: #6b9080;
+}
+
+.prescription-toggle:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.prescription-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: all 200ms ease;
+}
+
+.prescription-toggle.on .prescription-toggle-knob {
+  left: 23px;
+}
+
+.prescription-toggle-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: #4b5563;
+}
+
+/* ===== ACCORDION ===== */
+.prescription-accordion {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.prescription-accordion-header {
+  width: 100%;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.prescription-accordion-header:hover {
+  background: #fafafa;
+}
+
+.prescription-accordion-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: left;
+}
+
+.prescription-accordion-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #27272a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.prescription-accordion-subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: #a1a1aa;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.prescription-accordion-caret {
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.prescription-accordion-caret.open {
+  transform: rotate(180deg);
+}
+
+.prescription-accordion-content {
+  padding: 0 20px 16px 20px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #fafafa;
+}
+
+/* ===== FOOTER ===== */
+.prescription-footer {
+  margin-top: 0;
+  padding: 12px 32px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  z-index: 40;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .prescription-footer {
+    padding: 12px 24px;
+  }
+}
+
+.prescription-footer-buttons {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .prescription-footer-buttons {
+    width: 100%;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .prescription-footer-buttons button {
+    width: 100%;
+  }
+}
+
+/* ===== BUTTONS ===== */
+.prescription-btn-cancel {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.prescription-btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.prescription-btn-cancel:active {
+  transform: scale(0.98);
+}
+
+.prescription-btn-primary {
+  height: 44px;
+  padding: 0 28px;
+  border-radius: 10px;
+  background: #6b9080;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.prescription-btn-primary:hover:not(:disabled) {
+  background: #5a7d6d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(107, 144, 128, 0.3);
+}
+
+.prescription-btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.prescription-btn-primary:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* ===== SPINNER ===== */
+.prescription-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: prescriptionSpin 1s linear infinite;
+}
+
+@keyframes prescriptionSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== DISCARD CONFIRMATION DIALOG ===== */
+.prescription-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: prescriptionBackdropEnter 200ms ease-out forwards;
+}
+
+.prescription-confirm-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 360px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+  animation: prescriptionCardEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.prescription-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0 0 12px 0;
+}
+
+.prescription-confirm-message {
+  font-size: 14px;
+  font-weight: 400;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.prescription-confirm-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.prescription-btn-confirm-keep {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.prescription-btn-confirm-keep:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.prescription-btn-confirm-discard {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.prescription-btn-confirm-discard:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.prescription-btn-confirm-discard:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===== FOCUS RING GLOBAL ===== */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}

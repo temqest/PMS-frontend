@@ -1,0 +1,974 @@
+/* Patient Modal - Complete Fresh Build */
+/* Design: Pure white primary, sage green accent (#6B9080), Inter font, thin-line icons */
+
+/* ===== BACKDROP ===== */
+.patient-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  animation: patientBackdropEnter 200ms ease-out forwards;
+}
+
+@keyframes patientBackdropEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===== CONTAINER & CARD ===== */
+.patient-modal-container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  padding: 24px;
+}
+
+.patient-modal-card {
+  pointer-events: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 88vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  border: none;
+  outline: none;
+  animation: patientCardEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+}
+
+@keyframes patientCardEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ===== SUCCESS STATE ===== */
+.patient-success-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 32px;
+  text-align: center;
+  gap: 20px;
+}
+
+.patient-success-icon {
+  color: #6b9080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.patient-success-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.patient-success-summary {
+  font-size: 15px;
+  font-weight: 400;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.patient-btn-done {
+  height: 44px;
+  padding: 0 28px;
+  border-radius: 10px;
+  background: #6b9080;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  margin-top: 12px;
+}
+
+.patient-btn-done:hover {
+  background: #5a7d6d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(107, 144, 128, 0.3);
+}
+
+.patient-btn-done:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===== HEADER ===== */
+.patient-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 32px 32px 0 32px;
+  padding-bottom: 0;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .patient-header {
+    padding: 24px 24px 0 24px;
+    margin-bottom: 12px;
+  }
+}
+
+.patient-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.patient-icon-circle {
+  width: 44px;
+  height: 44px;
+  background: rgba(107, 144, 128, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b9080;
+  flex-shrink: 0;
+}
+
+.patient-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.patient-header-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.patient-header-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.patient-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.patient-close-btn:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+/* ===== FORM BODY ===== */
+.patient-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  padding: 32px;
+  padding-bottom: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+}
+
+.patient-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.patient-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.patient-form::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+.patient-form::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+@media (max-width: 639px) {
+  .patient-form {
+    padding: 24px;
+    padding-bottom: 12px;
+  }
+}
+
+/* ===== SECTION HEADERS ===== */
+.patient-section-header {
+  margin: 0;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.patient-section-header-secondary {
+  margin-top: 12px;
+}
+
+.patient-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== SUBSECTION TITLES (Inside Accordion) ===== */
+.patient-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.patient-subsection-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== FIELDS ===== */
+.patient-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.patient-field-full {
+  grid-column: 1 / -1;
+}
+
+.patient-field-row {
+  display: grid;
+  gap: 16px;
+}
+
+.patient-field-row-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.patient-field-row-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* Responsive stacking */
+@media (max-width: 639px) {
+  .patient-field-row-2,
+  .patient-field-row-3 {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* ===== LABELS ===== */
+.patient-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin: 0;
+  display: block;
+}
+
+/* ===== INPUT FIELDS ===== */
+.patient-input {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  transition: all 200ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-input::placeholder {
+  color: #a1a1aa;
+}
+
+.patient-input:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.patient-input-error {
+  border-color: #ef4444;
+}
+
+.patient-input-error:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08);
+}
+
+/* ===== PHONE INPUT ===== */
+.patient-phone-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.patient-phone-input {
+  padding-left: 44px;
+}
+
+/* ===== EMAIL INPUT ===== */
+.patient-email-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.patient-email-input {
+  padding-left: 44px;
+}
+
+/* ===== INPUT ICONS ===== */
+.patient-input-icon-left {
+  position: absolute;
+  left: 14px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.patient-input-icon-right {
+  position: absolute;
+  right: 14px;
+  color: #a1a1aa;
+  pointer-events: none;
+}
+
+/* ===== DATE INPUT ===== */
+.patient-date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.patient-date-input-wrapper input[type="date"] {
+  width: 100%;
+  padding-right: 44px;
+}
+
+/* Hide default date picker icon */
+.patient-date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* ===== SELECT DROPDOWNS ===== */
+.patient-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.patient-select {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  cursor: pointer;
+  transition: all 200ms ease;
+  appearance: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  padding-right: 40px;
+}
+
+.patient-select:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.patient-select-error {
+  border-color: #ef4444;
+}
+
+.patient-select-error:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08);
+}
+
+.patient-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.patient-select-caret {
+  position: absolute;
+  right: 14px;
+  color: #a1a1aa;
+  pointer-events: none;
+}
+
+/* ===== ERROR MESSAGES ===== */
+.patient-error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+/* ===== TEXTAREA ===== */
+.patient-textarea {
+  min-height: 100px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #27272a;
+  resize: vertical;
+  transition: all 200ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-textarea::placeholder {
+  color: #a1a1aa;
+}
+
+.patient-textarea:focus {
+  outline: none;
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+/* ===== TAG/CHIP INPUT ===== */
+.patient-tag-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  transition: all 200ms ease;
+  min-height: 48px;
+}
+
+.patient-tag-input-wrapper:focus-within {
+  border-color: #6b9080;
+  box-shadow: 0 0 0 4px rgba(107, 144, 128, 0.08);
+}
+
+.patient-tag-input {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 16px;
+  height: 36px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  background: transparent;
+  color: #27272a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-tag-input::placeholder {
+  color: #a1a1aa;
+}
+
+/* ===== TAGS ===== */
+.patient-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.patient-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  height: fit-content;
+}
+
+.patient-tag-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  transition: all 150ms ease;
+}
+
+.patient-tag-remove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 2px;
+}
+
+/* ===== ACCORDION ===== */
+.patient-accordion {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.patient-accordion-header {
+  width: 100%;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-accordion-header:hover {
+  background: #fafafa;
+}
+
+.patient-accordion-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: left;
+}
+
+.patient-accordion-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #27272a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.patient-accordion-subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: #a1a1aa;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.patient-accordion-caret {
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.patient-accordion-caret.open {
+  transform: rotate(180deg);
+}
+
+.patient-accordion-content {
+  padding: 0 20px 16px 20px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #fafafa;
+  max-height: 400px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+}
+
+.patient-accordion-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.patient-accordion-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.patient-accordion-content::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+.patient-accordion-content::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+/* ===== FOOTER ===== */
+.patient-footer {
+  margin-top: 8px;
+  padding: 12px 32px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: #ffffff;
+  z-index: 40;
+  flex-shrink: 0;
+}
+
+@media (max-width: 639px) {
+  .patient-footer {
+    margin-top: 6px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 12px 24px;
+  }
+}
+
+.patient-footer-action {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  padding: 0;
+  margin-right: auto;
+}
+
+.patient-footer-action:hover {
+  color: #dc2626;
+}
+
+.patient-footer-buttons {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 639px) {
+  .patient-footer-buttons {
+    width: 100%;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .patient-footer-buttons button {
+    width: 100%;
+  }
+}
+
+/* ===== BUTTONS ===== */
+.patient-btn-cancel {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.patient-btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.patient-btn-cancel:active {
+  transform: scale(0.98);
+}
+
+.patient-btn-primary {
+  height: 44px;
+  padding: 0 28px;
+  border-radius: 10px;
+  background: #6b9080;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.patient-btn-primary:hover:not(:disabled) {
+  background: #5a7d6d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(107, 144, 128, 0.3);
+}
+
+.patient-btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.patient-btn-primary:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* ===== SPINNER ===== */
+.patient-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: patientSpin 1s linear infinite;
+}
+
+@keyframes patientSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== DISCARD CONFIRMATION DIALOG ===== */
+.patient-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: patientBackdropEnter 200ms ease-out forwards;
+}
+
+.patient-confirm-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 360px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+  animation: patientCardEnter 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.patient-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #18181b;
+  margin: 0 0 12px 0;
+}
+
+.patient-confirm-message {
+  font-size: 14px;
+  font-weight: 400;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.patient-confirm-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.patient-btn-confirm-keep {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-btn-confirm-keep:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.patient-btn-confirm-discard {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.patient-btn-confirm-discard:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.patient-btn-confirm-discard:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===== FOCUS RING GLOBAL ===== */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+}
+
+/* ===== DAYPICKER CALENDAR ===== */
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: #6b9080;
+  --rdp-background-color: rgba(107, 144, 128, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.rdp-head_cell {
+  color: #9ca3af;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rdp-cell {
+  position: relative;
+}
+
+.rdp-day {
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  color: #374151;
+  transition: all 150ms ease;
+}
+
+.rdp-day:hover:not(.rdp-day_disabled):not(.rdp-day_outside) {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.rdp-day_selected:not([disabled]) {
+  background-color: #6b9080;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.rdp-day_selected:not([disabled]):hover {
+  background-color: #5a7d6f;
+}
+
+.rdp-day_disabled {
+  color: #d1d5db;
+  opacity: 0.5;
+}
+
+.rdp-day_today {
+  font-weight: 700;
+  color: #6b9080;
+}
+
+.rdp-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px 16px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.rdp-caption_label {
+  font-weight: 600;
+}
+
+.rdp-button {
+  border-radius: 6px;
+  padding: 4px 8px;
+  transition: all 150ms ease;
+}
+
+.rdp-button:hover:not([disabled]) {
+  background-color: #f3f4f6;
+}
+
+.rdp-months {
+  gap: 16px;
+}
+
+.rdp-month {
+  width: 100%;
+}
