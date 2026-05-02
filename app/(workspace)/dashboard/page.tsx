@@ -267,28 +267,19 @@ export default function DashboardPage() {
           await createPrescription({
             patient_id: data.patient?.id || "",
             patient_name: data.patient?.name || "",
-            provider: data.prescriber || "Assigned Provider",
+            provider: "Assigned Provider",
             record_date: data.startDate || new Date().toISOString().slice(0, 10),
-            medication_name: data.medicationName || "",
-            dosage: data.dosage || "",
-            form: data.form || "Tablet",
+            medicines: data.medicines,
             directions_for_use: data.directionsForUse || "",
-            quantity: Number(data.quantity || 0),
-            refills: Number(data.refills || 0),
-            pharmacy: data.pharmacy || null,
-            prescriber: data.prescriber || "",
             start_date: data.startDate || new Date().toISOString().slice(0, 10),
             end_date: data.endDate || "",
-            substitution_allowed: data.substitutionAllowed !== false,
-            additional_notes: data.additionalNotes || "",
           });
           pushToast({
             type: "success",
             title: "Prescription sent",
-            message: `${data.medicationName} sent to pharmacy.`,
+            message: `${data.medicines.length} medicine(s) added.`,
           });
         }}
-        mode="create"
       />
 
       <div className="grid gap-6 xl:grid-cols-2">

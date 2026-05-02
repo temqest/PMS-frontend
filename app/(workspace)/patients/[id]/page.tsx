@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, use } from "react";
-import { useEffect } from "react";
+import { use, useMemo, useState, useEffect } from "react";
 import { CalendarDays, MoreVertical, Pencil, Plus } from "lucide-react";
 
 import { useWorkspace } from "../../../components/workspace-shell";
 import { AvatarInitials, Badge, QuickLine, SectionHeader, WorkspaceCard } from "../../../components/workspace-ui";
+import AppointmentModal from "../../../components/modal/AppointmentModal";
+import RecordModal from "../../../components/modal/RecordModal";
+import PrescriptionModal from "../../../components/modal/PrescriptionModal";
 import api from "../../../../lib/api";
 import type { UiAppointment, UiHealthRecord, UiPrescription } from "../../../../lib/api";
+import type { RecordForm } from "../../../components/modal/RecordModal";
 
 type PatientProfile = {
   first_name?: string;
@@ -29,6 +32,24 @@ type PatientProfile = {
   status?: string;
 };
 
+const recordSummary = (record: RecordForm) => {
+  if (record.recordType === "Visit") return record.visitAssessment || record.visitReason;
+  if (record.recordType === "Lab Result") return record.labNotes;
+  if (record.recordType === "Imaging") return record.imagingImpression || record.imagingFindings;
+  if (record.recordType === "Prescription") return record.prescriptionDirections;
+  if (record.recordType === "Vaccination") return record.vaccinationNotes;
+  return record.noteContent;
+};
+
+const recordTitle = (record: RecordForm) => {
+  if (record.recordType === "Visit") return record.visitType;
+  if (record.recordType === "Lab Result") return record.labTestName;
+  if (record.recordType === "Imaging") return record.imagingStudyType;
+  if (record.recordType === "Prescription") return record.prescriptionMedicationName;
+  if (record.recordType === "Vaccination") return record.vaccinationName;
+  return record.noteType;
+};
+
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { pushToast, requestConfirm } = useWorkspace();
   const [tab, setTab] = useState("Overview");
@@ -39,12 +60,18 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [nowTs] = useState(() => Date.now());
   const resolvedParams = use(params);
+  const patientId = resolvedParams.id;
+
+  // Modal states
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const id = resolvedParams.id;
+        const id = patientId;
         const [patientResp, appointmentResp, recordResp, prescriptionResp] = await Promise.all([
           api.getPatient(id),
           api.getAppointments({ patient_id: id, limit: 200 }),
@@ -70,7 +97,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         setLoading(false);
       }
     })();
-  }, [resolvedParams.id]);
+  }, [patientId]);
 
   const display = patient;
   const fullName = `${display?.first_name || ""} ${display?.last_name || ""}`.trim();
@@ -110,10 +137,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             <button type="button" onClick={() => pushToast({ type: "info", title: "Edit patient", message: "Open the patient profile editor." })} className="inline-flex items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-4 py-3 text-sm hover:bg-[#F3F4F6]">
               <Pencil className="h-4 w-4" strokeWidth={1.5} />
               Edit
-            </button>
-            <button type="button" onClick={() => pushToast({ type: "success", title: "New appointment", message: `Start booking for ${fullName}.` })} className="inline-flex items-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white">
-              <Plus className="h-4 w-4" strokeWidth={1.5} />
-              New Appointment
             </button>
             <button type="button" onClick={() => requestConfirm({ title: "Remove patient?", description: `This will archive ${fullName}'s record and hide it from the active roster.`, confirmLabel: "Archive" })} className="rounded-[12px] border border-[#E5E7EB] px-4 py-3 text-sm hover:bg-[#F3F4F6]"><MoreVertical className="h-4 w-4" strokeWidth={1.5} /></button>
           </div>
@@ -228,7 +251,39 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
       ) : (
         <WorkspaceCard className="p-6">
-          <SectionHeader title={tab} />
+          <SectionHeader 
+            title={tab}
+            action={
+              tab === "Appointments" ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAppointmentModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={1.5} />
+                  Add Appointment
+                </button>
+              ) : tab === "Health Records" ? (
+                <button
+                  type="button"
+                  onClick={() => setIsRecordModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={1.5} />
+                  Add Health Record
+                </button>
+              ) : tab === "Prescriptions" ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPrescriptionModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={1.5} />
+                  Add Prescription
+                </button>
+              ) : null
+            }
+          />
           {tab === "Appointments" ? (
             <div className="mt-5 overflow-hidden rounded-[12px] border border-[#F3F4F6]">
               <table className="w-full text-left">
@@ -296,6 +351,95 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           )}
         </WorkspaceCard>
       )}
+      <AppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => setIsAppointmentModalOpen(false)}
+        onSubmit={async (appointment) => {
+          try {
+            const payload = {
+              patient_id: patientId,
+              patient_name: fullName,
+              appointment_type: appointment.appointmentType || "In-Person",
+              date: appointment.date || "",
+              time: appointment.time || "",
+              duration_minutes: appointment.duration || 30,
+              reason: appointment.reason,
+              priority: appointment.priority,
+              send_email_reminder: appointment.sendEmailReminder,
+              send_sms_reminder: appointment.sendSmsReminder,
+              send_confirmation: appointment.sendConfirmation,
+              internal_notes: appointment.internalNotes,
+            };
+            await api.createAppointment(payload);
+            pushToast({ type: "success", title: "Appointment created", message: `Appointment scheduled for ${fullName}.` });
+            setIsAppointmentModalOpen(false);
+            // Refresh appointments
+            const appointmentResp = await api.getAppointments({ patient_id: patientId, limit: 200 });
+            const apptRows = appointmentResp?.appointments || [];
+            setAppointments(Array.isArray(apptRows) ? apptRows.map(api.mapAppointmentToUi) : []);
+          } catch (error) {
+            pushToast({ type: "error", title: "Failed to create appointment", message: "Please try again." });
+          }
+        }}
+      />
+      <RecordModal
+        isOpen={isRecordModalOpen}
+        onClose={() => setIsRecordModalOpen(false)}
+        onSubmit={async (record) => {
+          try {
+            const payload = {
+              patient_id: patientId,
+              patient_name: fullName,
+              record_type: record.recordType,
+              record_date: record.date,
+              provider: record.provider,
+              summary: recordSummary(record),
+              details: {
+                title: recordTitle(record),
+                summary: recordSummary(record),
+                ...record,
+              },
+            };
+            await api.createHealthRecord(payload);
+            pushToast({ type: "success", title: "Health record created", message: `Record added for ${fullName}.` });
+            setIsRecordModalOpen(false);
+            // Refresh records
+            const recordResp = await api.getHealthRecords({ patient_id: patientId, limit: 200 });
+            const recordRows = recordResp?.records || [];
+            const mappedRecords = Array.isArray(recordRows) ? recordRows.map(api.mapHealthRecordToUi) : [];
+            setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
+          } catch (error) {
+            pushToast({ type: "error", title: "Failed to create health record", message: "Please try again." });
+          }
+        }}
+      />
+      <PrescriptionModal
+        isOpen={isPrescriptionModalOpen}
+        onClose={() => setIsPrescriptionModalOpen(false)}
+        onSubmit={async (prescription) => {
+          try {
+            const payload = {
+              patient_id: patientId,
+              patient_name: fullName,
+              provider: "Assigned Provider",
+              record_date: prescription.startDate,
+              medicines: prescription.medicines,
+              directions_for_use: prescription.directionsForUse,
+              start_date: prescription.startDate,
+              end_date: prescription.endDate,
+            };
+            await api.createPrescription(payload);
+            pushToast({ type: "success", title: "Prescription created", message: `Prescription added for ${fullName}.` });
+            setIsPrescriptionModalOpen(false);
+            // Refresh prescriptions
+            const prescriptionResp = await api.getPrescriptions({ patient_id: patientId, limit: 200 });
+            const rxRows = prescriptionResp?.records || [];
+            setPrescriptions(Array.isArray(rxRows) ? rxRows.map(api.mapHealthRecordToUiPrescription) : []);
+          } catch (error) {
+            pushToast({ type: "error", title: "Failed to create prescription", message: "Please try again." });
+          }
+        }}
+      />
     </div>
   );
 }

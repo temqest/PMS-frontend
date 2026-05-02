@@ -56,7 +56,6 @@ export type RecordForm = {
   visitWeight: string;
   visitHeight: string;
   visitAssessment: string;
-  diagnosisCodes: string[];
   labTestName: string;
   labResultValue: string;
   labUnit: string;
@@ -163,7 +162,6 @@ function createInitialForm(
     visitWeight: initialData?.visitWeight ?? "",
     visitHeight: initialData?.visitHeight ?? "",
     visitAssessment: initialData?.visitAssessment ?? "",
-    diagnosisCodes: initialData?.diagnosisCodes ?? [],
     labTestName: initialData?.labTestName ?? "",
     labResultValue: initialData?.labResultValue ?? "",
     labUnit: initialData?.labUnit ?? "",
@@ -265,7 +263,6 @@ export default function RecordModal({
   const [medicationQuery, setMedicationQuery] = useState("");
   const [pharmacyQuery, setPharmacyQuery] = useState("");
   const [previousNoteQuery, setPreviousNoteQuery] = useState("");
-  const [diagnosisInput, setDiagnosisInput] = useState("");
   const [isVitalsOpen, setIsVitalsOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [patientLockedState, setPatientLockedState] = useState(patientLocked);
@@ -290,7 +287,6 @@ export default function RecordModal({
       setMedicationQuery("");
       setPharmacyQuery("");
       setPreviousNoteQuery("");
-      setDiagnosisInput("");
       setIsVitalsOpen(false);
       setDragActive(false);
       setPatientLockedState(patientLocked);
@@ -443,7 +439,6 @@ export default function RecordModal({
     setMedicationQuery("");
     setPharmacyQuery("");
     setPreviousNoteQuery("");
-    setDiagnosisInput("");
     setIsVitalsOpen(false);
     setDragActive(false);
     setPatientSearchOpen(false);
@@ -478,27 +473,6 @@ export default function RecordModal({
     setPatientQuery(patient.name);
     setPatientSearchOpen(false);
     setErrors((previous) => ({ ...previous, patient: "" }));
-    markDirty();
-  };
-
-  const addDiagnosisCode = () => {
-    const code = diagnosisInput.trim().toUpperCase();
-    if (!code) return;
-    if (form.diagnosisCodes.includes(code)) {
-      setDiagnosisInput("");
-      return;
-    }
-
-    setForm((previous) => ({ ...previous, diagnosisCodes: [...previous.diagnosisCodes, code] }));
-    setDiagnosisInput("");
-    markDirty();
-  };
-
-  const removeDiagnosisCode = (codeToRemove: string) => {
-    setForm((previous) => ({
-      ...previous,
-      diagnosisCodes: previous.diagnosisCodes.filter((code) => code !== codeToRemove),
-    }));
     markDirty();
   };
 
@@ -864,36 +838,6 @@ export default function RecordModal({
                         />
                       </div>
 
-                      <div className="record-field">
-                        <label className="record-label">Diagnosis Codes</label>
-                        <div className="record-chip-input">
-                          {form.diagnosisCodes.map((code) => (
-                            <span key={code} className="record-chip">
-                              {code}
-                              <button type="button" className="record-chip-remove" onClick={() => removeDiagnosisCode(code)} aria-label={`Remove ${code}`}>
-                                <X size={12} strokeWidth={1.5} />
-                              </button>
-                            </span>
-                          ))}
-                          <input
-                            className="record-chip-entry"
-                            value={diagnosisInput}
-                            placeholder="Type ICD-10 code and press Enter"
-                            onChange={(event) => setDiagnosisInput(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                addDiagnosisCode();
-                                return;
-                              }
-                              if (event.key === "Backspace" && !diagnosisInput && form.diagnosisCodes.length > 0) {
-                                removeDiagnosisCode(form.diagnosisCodes[form.diagnosisCodes.length - 1]);
-                              }
-                            }}
-                            onBlur={addDiagnosisCode}
-                          />
-                        </div>
-                      </div>
                     </>
                   ) : null}
 

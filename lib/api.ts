@@ -77,23 +77,22 @@ export type PrescriptionPayload = {
   provider: string;
   record_date: string;
   save_state?: HealthRecordSaveState;
-  medication_name: string;
-  dosage: string;
-  form: string;
+  medicines: PrescriptionMedicineLineItem[];
   directions_for_use: string;
-  quantity: number;
-  refills: number;
-  pharmacy?: {
-    id?: string;
-    name?: string;
-    address?: string;
-    phone?: string;
-  } | null;
-  prescriber?: string;
   start_date: string;
   end_date?: string;
-  substitution_allowed?: boolean;
-  additional_notes?: string;
+};
+
+export type PrescriptionMedicineLineItem = {
+  medicineId: string;
+  medicineName: string;
+  prescribedDosage: string;
+  availableQuantity: number;
+  prescribedQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  expiry?: string;
+  status: string;
 };
 
 export type UiPrescription = {
@@ -104,20 +103,12 @@ export type UiPrescription = {
   medicationName: string;
   dosage: string;
   form: string;
+  medicines: PrescriptionMedicineLineItem[];
   directionsForUse: string;
   quantity: number;
   refills: number;
-  pharmacy: {
-    id?: string;
-    name?: string;
-    address?: string;
-    phone?: string;
-  } | null;
-  prescriber: string;
   startDate: string;
   endDate: string;
-  substitutionAllowed: boolean;
-  additionalNotes: string;
   saveState: HealthRecordSaveState;
 };
 
@@ -140,6 +131,16 @@ export type UiAppointment = {
 };
 
 export type PatientOption = { id: string; name: string };
+
+export type PrescriptionMedicine = {
+  id: string;
+  name: string;
+  dosage: string;
+  quantity: number;
+  price: number;
+  expiry?: string;
+  status: string;
+};
 
 const toUiType = (type?: string): "In-person" | "Telehealth" => (
   type === "Telehealth" ? "Telehealth" : "In-person"
@@ -259,6 +260,10 @@ export const mapHealthRecordToUiPrescription = (item: Record<string, unknown>): 
     details?: Record<string, unknown>;
   };
   const details = source.details || {};
+  const medicines = Array.isArray(details.medicines)
+    ? (details.medicines as PrescriptionMedicineLineItem[])
+    : [];
+  const firstMedicine = medicines[0];
   return {
     id: source.record_id || source._id || "",
     patient: {
@@ -267,24 +272,22 @@ export const mapHealthRecordToUiPrescription = (item: Record<string, unknown>): 
     },
     provider: source.provider || "",
     dateIso: source.record_date || "",
-    medicationName: typeof details.medicationName === "string" ? details.medicationName : "",
-    dosage: typeof details.dosage === "string" ? details.dosage : "",
-    form: typeof details.form === "string" ? details.form : "Tablet",
+    medicationName:
+      typeof details.medicationName === "string"
+        ? details.medicationName
+        : firstMedicine?.medicineName || "",
+    dosage:
+      typeof details.dosage === "string"
+        ? details.dosage
+        : firstMedicine?.prescribedDosage || "",
+    form: typeof details.form === "string" ? details.form : "Prescription",
+    medicines,
     directionsForUse:
       typeof details.directionsForUse === "string" ? details.directionsForUse : "",
     quantity: Number(details.quantity || 0),
     refills: Number(details.refills || 0),
-    pharmacy:
-      details.pharmacy && typeof details.pharmacy === "object"
-        ? (details.pharmacy as UiPrescription["pharmacy"])
-        : null,
-    prescriber: typeof details.prescriber === "string" ? details.prescriber : "",
     startDate: typeof details.startDate === "string" ? details.startDate : "",
     endDate: typeof details.endDate === "string" ? details.endDate : "",
-    substitutionAllowed:
-      typeof details.substitutionAllowed === "boolean" ? details.substitutionAllowed : true,
-    additionalNotes:
-      typeof details.additionalNotes === "string" ? details.additionalNotes : "",
     saveState: source.save_state || "final",
   };
 };
@@ -298,20 +301,18 @@ const toPrescriptionHealthRecordPayload = (payload: PrescriptionPayload): Health
   save_state: payload.save_state || "final",
   summary: payload.directions_for_use || "",
   details: {
-    title: payload.medication_name,
+    title: payload.medicines.map((item) => item.medicineName).join(", "),
     summary: payload.directions_for_use || "",
-    medicationName: payload.medication_name,
-    dosage: payload.dosage,
-    form: payload.form,
+    medicines: payload.medicines,
+    medicationName: payload.medicines[0]?.medicineName || "",
+    dosage: payload.medicines[0]?.prescribedDosage || "",
     directionsForUse: payload.directions_for_use,
-    quantity: payload.quantity,
-    refills: payload.refills,
-    pharmacy: payload.pharmacy || null,
-    prescriber: payload.prescriber || "",
+    quantity: payload.medicines.reduce(
+      (total, item) => total + Number(item.prescribedQuantity || 0),
+      0
+    ),
     startDate: payload.start_date,
     endDate: payload.end_date || "",
-    substitutionAllowed: payload.substitution_allowed !== false,
-    additionalNotes: payload.additional_notes || "",
   },
 });
 
@@ -347,6 +348,18 @@ export const updateHealthRecord = (id: string, payload: Partial<HealthRecordPayl
   request(`/api/v1/health-records/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
 export const deleteHealthRecord = (id: string) =>
   request(`/api/v1/health-records/${id}`, { method: "DELETE" });
+export const getPrescriptionMedicines = async (): Promise<PrescriptionMedicine[]> => {
+  const res = await fetch("/api/prescription-medicines", {
+    headers: { Accept: "application/json" },
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw result;
+  }
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.data)) return result.data;
+  return [];
+};
 
 export const getPrescriptions = (params?: Record<string, string | number | undefined>) =>
   request(
@@ -370,6 +383,7 @@ const api = {
   createHealthRecord,
   updateHealthRecord,
   deleteHealthRecord,
+  getPrescriptionMedicines,
   getPrescriptions,
   createPrescription,
   mapAppointmentToUi,
