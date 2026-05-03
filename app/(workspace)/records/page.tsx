@@ -8,8 +8,10 @@ import { FileText, FlaskConical, Image as ImageIcon, Pill, ArrowRight, Search } 
 import { useWorkspace } from "../../components/workspace-shell";
 import { AvatarInitials, Badge, FilterPill, SectionHeader, WorkspaceCard } from "../../components/workspace-ui";
 import RecordModal, { type PatientSummary, type RecordForm, type RecordType } from "../../components/modal/RecordModal";
+import PrescriptionInvoiceModal from "../../components/modal/PrescriptionInvoiceModal";
 import {
   createHealthRecord,
+  createPrescriptionInvoice,
   deleteHealthRecord,
   getHealthRecords,
   getPatients,
@@ -105,6 +107,8 @@ export default function RecordsPage() {
   const [error, setError] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
   const [showRecordModal, setShowRecordModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedRecord, setSelectedRecord] = useState<UiHealthRecord | null>(null);
   const [modalInitialData, setModalInitialData] = useState<Partial<RecordForm> | undefined>(undefined);
@@ -218,6 +222,25 @@ export default function RecordsPage() {
     setSelectedRecord(record);
     setModalInitialData(buildInitialDataFromRecord(record));
     setShowRecordModal(true);
+  };
+
+  const handleCreateInvoice = () => {
+    setShowInvoiceModal(true);
+  };
+
+  const handleInvoiceSubmit = async (payload: Parameters<typeof createPrescriptionInvoice>[0]) => {
+    setInvoiceSubmitting(true);
+    try {
+      await createPrescriptionInvoice(payload);
+      pushToast({ type: "success", title: "Invoice created", message: "Prescription invoice has been saved." });
+      setShowInvoiceModal(false);
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || "Unable to create invoice.";
+      pushToast({ type: "error", title: "Invoice failed", message });
+      throw err;
+    } finally {
+      setInvoiceSubmitting(false);
+    }
   };
 
   const handleModalSubmit = async (data: RecordForm & { saveState: "draft" | "final" }) => {
@@ -377,7 +400,10 @@ export default function RecordsPage() {
         <WorkspaceCard className="p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <SectionHeader title="Health Records" subtitle="Timeline, filters, and structured clinical history." />
-            <button type="button" onClick={handleCreate} className="rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white">New Record</button>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={handleCreate} className="rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white">New Record</button>
+              <button type="button" onClick={handleCreateInvoice} className="rounded-[12px] border border-[#E5E7EB] bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-[#F3F4F6]">New Invoice</button>
+            </div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             <FilterPill active>Last 30 Days</FilterPill>
@@ -454,6 +480,13 @@ export default function RecordsPage() {
       patientLocked={!!selectedPatient}
       patients={patients}
       providers={providers}
+    />
+    <PrescriptionInvoiceModal
+      isOpen={showInvoiceModal}
+      onClose={() => setShowInvoiceModal(false)}
+      onSubmit={handleInvoiceSubmit}
+      preselectedPatient={selectedPatient || undefined}
+      patients={patients}
     />
     </>
   );

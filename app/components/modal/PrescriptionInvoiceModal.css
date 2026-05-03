@@ -1,0 +1,246 @@
+.invoice-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+
+.invoice-modal-container {
+  position: fixed;
+  inset: 0;
+  z-index: 51;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.invoice-modal-card {
+  width: min(100%, 680px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.invoice-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 28px 30px 0;
+}
+
+.invoice-modal-eyebrow {
+  margin: 0 0 8px;
+  color: #6b9080;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.invoice-modal-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  color: #111827;
+}
+
+.invoice-close-btn {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.invoice-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 30px 30px;
+}
+
+.invoice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.invoice-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.invoice-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.invoice-input,
+.invoice-readonly-box {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+}
+
+.invoice-input:focus {
+  outline: 2px solid rgba(107, 144, 128, 0.24);
+  border-color: #6b9080;
+}
+
+.invoice-readonly-box {
+  display: flex;
+  align-items: center;
+  background: #f9fafb;
+}
+
+.invoice-help-text {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.invoice-line-editor {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.invoice-btn-secondary,
+.invoice-btn-primary,
+.invoice-btn-outline {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.invoice-btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+  border-color: #d1d5db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.invoice-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.invoice-btn-primary {
+  background: #6b9080;
+  color: #ffffff;
+  border-color: #6b9080;
+}
+
+.invoice-btn-primary:hover {
+  background: #5a7d6d;
+}
+
+.invoice-btn-outline {
+  background: #ffffff;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.invoice-line-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.invoice-line-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.invoice-line-meta {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.invoice-remove-btn {
+  border: none;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invoice-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.invoice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.invoice-field-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.invoice-success-state {
+  padding: 48px 30px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  text-align: center;
+}
+
+.invoice-success-icon {
+  color: #6b9080;
+}
+
+.invoice-success-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.invoice-success-text {
+  margin: 0;
+  color: #4b5563;
+  font-size: 15px;
+}

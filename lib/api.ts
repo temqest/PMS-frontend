@@ -95,6 +95,25 @@ export type PrescriptionMedicineLineItem = {
   status: string;
 };
 
+export type PrescriptionInvoiceItem = {
+  medicineId: string;
+  medicineName: string;
+  prescribedDosage: string;
+  prescribedQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
+};
+
+export type PrescriptionInvoicePayload = {
+  patient_id: string;
+  patient_name: string;
+  health_record_id?: string;
+  items: PrescriptionInvoiceItem[];
+  total_amount: number;
+  invoice_date?: string;
+  status?: 'pending' | 'paid' | 'cancelled';
+};
+
 export type UiPrescription = {
   id: string;
   patient: PatientOption;
@@ -367,6 +386,8 @@ export const getPrescriptions = (params?: Record<string, string | number | undef
   );
 export const createPrescription = (payload: PrescriptionPayload) =>
   createHealthRecord(toPrescriptionHealthRecordPayload(payload));
+export const createPrescriptionInvoice = (payload: PrescriptionInvoicePayload) =>
+  request(`/api/v1/prescription-invoices`, { method: 'POST', body: JSON.stringify(payload) });
 
 const api = {
   getPatients,
@@ -386,6 +407,7 @@ const api = {
   getPrescriptionMedicines,
   getPrescriptions,
   createPrescription,
+  createPrescriptionInvoice,
   mapAppointmentToUi,
   mapHealthRecordToUi,
   mapHealthRecordToUiPrescription,
