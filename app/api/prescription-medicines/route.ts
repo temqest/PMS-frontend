@@ -23,6 +23,8 @@ const normalizeMedicine = (item: InventoryItem) => ({
 
 export async function GET() {
   const inventoryUrl = process.env.PRESCRIPTION_API_URL;
+  const inventoryApiKey = process.env.PRESCRIPTION_API_KEY;
+  const inventoryBearerToken = process.env.PRESCRIPTION_API_BEARER_TOKEN;
 
   if (!inventoryUrl) {
     return NextResponse.json(
@@ -32,8 +34,16 @@ export async function GET() {
   }
 
   try {
+    const upstreamHeaders: HeadersInit = { Accept: "application/json" };
+    if (inventoryApiKey) {
+      upstreamHeaders["x-api-key"] = inventoryApiKey;
+    }
+    if (inventoryBearerToken) {
+      upstreamHeaders["Authorization"] = `Bearer ${inventoryBearerToken}`;
+    }
+
     const response = await fetch(inventoryUrl, {
-      headers: { Accept: "application/json" },
+      headers: upstreamHeaders,
       next: { revalidate: 60 },
     });
 
