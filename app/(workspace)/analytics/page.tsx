@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
+  AlertTriangle,
   Download,
   Droplet,
   Heart,
-  Scan,
   Hospital,
+  Loader2,
   Pill,
-  Brain,
+  ScanLine,
+  UserRound,
   MoreVertical,
 } from "lucide-react";
 
@@ -18,191 +22,277 @@ import {
   WorkspaceCard,
   AvatarInitials,
 } from "../../components/workspace-ui";
+import {
+  getPredictiveAlerts,
+  getPredictiveDashboard,
+  type AlertTypeCount,
+  type CareAlertItem,
+  type PredictiveDashboardPayload,
+  type RiskBucketRow,
+  type TopHighRiskPatient,
+} from "../../../lib/api";
 
-// Mock data for risk overview
-const riskCards = [
-  {
-    title: "High Risk",
-    count: "24",
-    trend: "+3",
-    trendPositive: false,
-    subtitle: "Need immediate intervention",
-  },
-  {
-    title: "Moderate Risk",
-    count: "67",
-    trend: "-2",
-    trendPositive: true,
-    subtitle: "Follow-up within 14 days",
-  },
-  {
-    title: "Care Gaps",
-    count: "41",
-    trend: "+5",
-    trendPositive: false,
-    subtitle: "Overdue screenings or labs",
-  },
-  {
-    title: "Interventions Completed",
-    count: "156",
-    trend: "+12",
-    trendPositive: true,
-    subtitle: "Preventive actions this period",
-  },
-];
+const RISK_ORDER = ["Low", "Moderate", "High", "Critical"] as const;
+const GAP_ALERT_TYPES = new Set(["VACCINATION_GAP", "ADHERENCE_GAP", "LAB_TREND"]);
 
-// Predictive insights with mock data
-const predictiveInsights = [
-  {
-    id: "diabetes",
-    icon: Droplet,
-    title: "Diabetes Risk",
-    risk: "High",
-    prediction:
-      "3.2x more likely to develop Type 2 Diabetes within 24 months based on BMI trajectory and HbA1c trends.",
-    sparkline: [12, 15, 18, 20, 22, 25, 28, 30],
-  },
-  {
-    id: "cardio",
-    icon: Heart,
-    title: "Cardiovascular Risk",
-    risk: "Moderate",
-    prediction:
-      "Elevated blood pressure patterns combined with high cholesterol suggest increased cardiovascular event risk within 36 months.",
-    sparkline: [8, 10, 12, 11, 13, 15, 14, 16],
-  },
-  {
-    id: "cancer",
-    icon: Scan,
-    title: "Cancer Screening Gap",
-    risk: "High",
-    prediction:
-      "Overdue mammogram screening. Age-risk profile suggests routine screening is critical for early detection.",
-    sparkline: [5, 6, 8, 7, 9, 8, 10, 11],
-  },
-  {
-    id: "readmission",
-    icon: Hospital,
-    title: "Readmission Risk",
-    risk: "Moderate",
-    prediction:
-      "Recent hospitalization combined with medication non-compliance increases 30-day readmission probability to 22%.",
-    sparkline: [20, 22, 25, 24, 26, 28, 27, 29],
-  },
-  {
-    id: "adherence",
-    icon: Pill,
-    title: "Medication Adherence",
-    risk: "Moderate",
-    prediction:
-      "Refill patterns suggest 35% non-compliance with prescribed regimen. Consider compliance coaching.",
-    sparkline: [40, 38, 35, 32, 30, 28, 25, 24],
-  },
-  {
-    id: "mental",
-    icon: Brain,
-    title: "Mental Health Flag",
-    risk: "Moderate",
-    prediction:
-      "Screening scores and appointment gaps suggest possible depression. Recommend psychiatric referral.",
-    sparkline: [6, 8, 10, 12, 15, 18, 20, 22],
-  },
-];
+function bucketCount(rows: RiskBucketRow[] | undefined, levels: string[]): number {
+  if (!rows?.length) return 0;
+  return rows.reduce((sum, row) => {
+    const id = row._id ?? "";
+    return levels.includes(id) ? sum + (Number(row.count) || 0) : sum;
+  }, 0);
+}
 
-// Mock care gaps data
-const careGapsData = [
-  {
-    initials: "JD",
-    name: "John Davis",
-    age: 58,
-    riskScore: 8.2,
-    riskLevel: "High",
-    gap: "Overdue HbA1c (6 months)",
-    outcome: "Likely uncontrolled diabetes within 12mo",
-    action: "Order HbA1c + lipid panel",
-    impact: "High",
-  },
-  {
-    initials: "SM",
-    name: "Sarah Miller",
-    age: 45,
-    riskScore: 6.1,
-    riskLevel: "Moderate",
-    gap: "Mammogram overdue (2 years)",
-    outcome: "Missed early cancer detection window",
-    action: "Schedule mammogram screening",
-    impact: "Medium",
-  },
-  {
-    initials: "RK",
-    name: "Robert Kim",
-    age: 72,
-    riskScore: 7.9,
-    riskLevel: "High",
-    gap: "Medication compliance review needed",
-    outcome: "30-day readmission probability 22%",
-    action: "Compliance coaching call",
-    impact: "High",
-  },
-  {
-    initials: "MJ",
-    name: "Michelle Johnson",
-    age: 53,
-    riskScore: 5.4,
-    riskLevel: "Moderate",
-    gap: "Lipid panel (18 months)",
-    outcome: "Unmonitored cardiovascular risk",
-    action: "Order lipid panel + lifestyle consult",
-    impact: "Medium",
-  },
-];
+function gapAlertSum(alertCounts: AlertTypeCount[] | undefined): number {
+  if (!alertCounts?.length) return 0;
+  return alertCounts.reduce((sum, row) => {
+    const id = row._id ?? "";
+    return GAP_ALERT_TYPES.has(id) ? sum + (Number(row.count) || 0) : sum;
+  }, 0);
+}
+
+function totalActiveAlerts(alertCounts: AlertTypeCount[] | undefined): number {
+  if (!alertCounts?.length) return 0;
+  return alertCounts.reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+}
+
+function totalProfiledPatients(rows: RiskBucketRow[] | undefined): number {
+  if (!rows?.length) return 0;
+  return rows.reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+}
+
+function alertTypeLabel(t: string): string {
+  return t
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function alertIcon(type: string) {
+  switch (type) {
+    case "LAB_TREND":
+    case "CRITICAL_LAB":
+      return Droplet;
+    case "CHRONIC_RISK":
+      return Heart;
+    case "READMISSION_RISK":
+      return Hospital;
+    case "ADHERENCE_GAP":
+      return Pill;
+    case "VACCINATION_GAP":
+      return ScanLine;
+    case "NO_SHOW_RISK":
+      return UserRound;
+    default:
+      return AlertTriangle;
+  }
+}
+
+function severityToRiskStyle(severity: string): {
+  risk: string;
+  color: string;
+  bg: string;
+  tone: "red" | "amber" | "sage";
+} {
+  if (severity === "Critical")
+    return { risk: "Critical", color: "#C45B5B", bg: "rgba(196, 91, 91, 0.06)", tone: "red" };
+  if (severity === "Warning")
+    return { risk: "Moderate", color: "#D4A373", bg: "rgba(212, 163, 115, 0.06)", tone: "amber" };
+  return { risk: "Low", color: "#6B9080", bg: "rgba(107, 144, 128, 0.06)", tone: "sage" };
+}
+
+function levelToTone(level: string): "red" | "amber" | "sage" {
+  if (level === "Critical" || level === "High") return "red";
+  if (level === "Moderate") return "amber";
+  return "sage";
+}
+
+function formatFetchTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** First unresolved alert title per patient (stable order by array index from API). */
+function firstAlertByPatient(
+  alerts: CareAlertItem[] | undefined
+): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!alerts?.length) return map;
+  for (const a of alerts) {
+    const pid = a.patient_id;
+    if (!pid || map.has(pid)) continue;
+    map.set(pid, (a.title || a.alert_type || "Alert").toString());
+  }
+  return map;
+}
 
 export default function AnalyticsPage() {
   const { pushToast } = useWorkspace();
-  const [dateRange, setDateRange] = useState("30 Days");
+  const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] = useState<PredictiveDashboardPayload | null>(
+    null
+  );
+  const [alerts, setAlerts] = useState<CareAlertItem[]>([]);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("pms_token") : null;
+      if (!token) {
+        pushToast({
+          type: "error",
+          title: "Not signed in",
+          message: "Log in again to load predictive analytics.",
+        });
+        setDashboard(null);
+        setAlerts([]);
+        return;
+      }
+
+      const [dash, alertsRes] = await Promise.all([
+        getPredictiveDashboard(),
+        getPredictiveAlerts({
+          is_resolved: false,
+          limit: 60,
+          page: 1,
+        }),
+      ]);
+      setDashboard(dash ?? null);
+      setAlerts(Array.isArray(alertsRes?.alerts) ? alertsRes.alerts : []);
+      setFetchedAt(new Date().toISOString());
+    } catch (err: unknown) {
+      const status =
+        err instanceof Error && "status" in err && typeof (err as Error & { status?: number }).status === "number"
+          ? (err as Error & { status: number }).status
+          : undefined;
+      const msg = err instanceof Error ? err.message : "Unable to load analytics.";
+      if (status === 403) {
+        pushToast({
+          type: "error",
+          title: "Access denied",
+          message: "Your role does not include predictive analytics access.",
+        });
+      } else if (status === 401) {
+        pushToast({
+          type: "error",
+          title: "Session expired",
+          message: "Log in again to continue.",
+        });
+      } else {
+        pushToast({ type: "error", title: "Analytics failed", message: msg });
+      }
+      setDashboard(null);
+      setAlerts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [pushToast]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadData]);
 
   const handleDownload = () => {
     pushToast({
       type: "info",
-      title: "Export started",
-      message: "Patient Intelligence report is being prepared for download.",
+      title: "Export",
+      message: "Export uses on-screen summaries for now.",
     });
   };
 
-  // Sparkline helper - converts data to SVG polyline points
-  const sparklinePoints = (data: number[]) => {
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    const range = max - min || 1;
-    return data
-      .map((v, i) => {
-        const x = (i / (data.length - 1)) * 100;
-        const y = 100 - ((v - min) / range) * 100;
-        return `${x},${y}`;
-      })
-      .join(" ");
-  };
+  const riskCards = useMemo(() => {
+    const dist = dashboard?.riskDistribution;
+    const ac = dashboard?.alertCounts;
+    const highCritical = bucketCount(dist, ["High", "Critical"]);
+    const moderate = bucketCount(dist, ["Moderate"]);
+    const gaps = gapAlertSum(ac);
+    const active = totalActiveAlerts(ac);
+    return [
+      {
+        title: "High / critical risk",
+        count: String(highCritical),
+        subtitle: "Patients flagged High or Critical",
+      },
+      {
+        title: "Moderate risk",
+        count: String(moderate),
+        subtitle: "Monitor within standard windows",
+      },
+      {
+        title: "Care gap alerts",
+        count: String(gaps),
+        subtitle: "Vaccination, adherence, lab trend (active)",
+      },
+      {
+        title: "Active alerts",
+        count: String(active),
+        subtitle: "Unresolved alerts (all types)",
+      },
+    ];
+  }, [dashboard]);
 
-  // Helper to get risk color
-  const getRiskColor = (risk: string) =>
-    risk === "High" ? "#C45B5B" : risk === "Moderate" ? "#D4A373" : "#6B9080";
+  const riskBars = useMemo(() => {
+    const dist = dashboard?.riskDistribution ?? [];
+    const map = new Map(dist.map((r) => [r._id ?? "", Number(r.count) || 0]));
+    const total = totalProfiledPatients(dist);
+    return RISK_ORDER.map((level) => ({
+      level,
+      count: map.get(level) ?? 0,
+      pct: total > 0 ? ((map.get(level) ?? 0) / total) * 100 : 0,
+    }));
+  }, [dashboard]);
 
-  // Helper to get risk background
-  const getRiskBg = (risk: string) =>
-    risk === "High"
-      ? "rgba(196, 91, 91, 0.06)"
-      : risk === "Moderate"
-        ? "rgba(212, 163, 115, 0.06)"
-        : "rgba(107, 144, 128, 0.06)";
+  const sortedAlertTypes = useMemo(() => {
+    const ac = [...(dashboard?.alertCounts ?? [])];
+    ac.sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+    const max =
+      ac.reduce((m, r) => Math.max(m, Number(r.count) || 0), 0) || 1;
+    return ac.map((row) => ({
+      type: row._id ?? "Unknown",
+      count: Number(row.count) || 0,
+      barPct: ((Number(row.count) || 0) / max) * 100,
+    }));
+  }, [dashboard]);
 
-  // Helper to get badge tone
-  const getBadgeTone = (risk: string) =>
-    risk === "High" ? "red" : risk === "Moderate" ? "amber" : "sage";
+  const insightAlerts = useMemo(
+    () => alerts.slice(0, 6),
+    [alerts]
+  );
+
+  const primaryAlertTitles = useMemo(
+    () => firstAlertByPatient(alerts),
+    [alerts]
+  );
+
+  const topPatients: TopHighRiskPatient[] = dashboard?.topHighRisk ?? [];
+  const hasNoProfiles =
+    !loading &&
+    dashboard &&
+    totalProfiledPatients(dashboard.riskDistribution) === 0 &&
+    (!topPatients || topPatients.length === 0);
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header Row */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Patient Intelligence
@@ -210,129 +300,154 @@ export default function AnalyticsPage() {
           <p className="mt-1 text-sm text-slate-500">
             Predictive insights to guide proactive care
           </p>
+          <p className="mt-2 inline-block rounded-full border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-1 text-xs text-slate-600">
+            Population snapshot — date filters coming soon
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(["30 Days", "90 Days", "YTD"] as const).map((range) => (
-            <button
-              key={range}
-              type="button"
-              onClick={() => setDateRange(range)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                dateRange === range
-                  ? "border-[#6B9080] bg-[rgba(107,144,128,0.08)] text-[#6B9080]"
-                  : "border-[#E5E7EB] bg-white text-slate-600 hover:bg-[#F3F4F6]"
-              }`}
-            >
-              {range}
-            </button>
-          ))}
+          {fetchedAt ? (
+            <span className="text-xs text-slate-400">
+              Updated {formatFetchTime(fetchedAt)}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            disabled={loading}
+            className="flex items-center gap-1 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-[#F3F4F6] disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <Activity className="h-4 w-4" strokeWidth={1.5} />
+            )}
+            Refresh
+          </button>
           <button
             type="button"
             onClick={handleDownload}
-            className="ml-2 rounded-[12px] border border-[#E5E7EB] bg-white p-2 text-slate-600 hover:bg-[#F3F4F6]"
-            title="Download report"
+            className="rounded-[12px] border border-[#E5E7EB] bg-white p-2 text-slate-600 hover:bg-[#F3F4F6]"
+            title="Export"
           >
             <Download className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
       </div>
 
-      {/* Risk Overview Cards - 4 Column Row */}
+      {hasNoProfiles ? (
+        <WorkspaceCard className="border-amber-200 bg-amber-50/60 p-6">
+          <p className="font-medium text-slate-900">
+            No risk profiles computed yet
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            After clinical data exists, run{" "}
+            <code className="rounded bg-white px-1 py-0.5 text-xs">
+              POST /api/v1/predictive-care/profiles/:patientId/compute
+            </code>{" "}
+            (or batch on the server) so this dashboard can populate.
+          </p>
+        </WorkspaceCard>
+      ) : null}
+
+      {/* Risk overview KPIs */}
       <div className="grid gap-4 lg:grid-cols-4">
         {riskCards.map((card) => (
-          <WorkspaceCard key={card.title} className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-slate-600">
-                  {card.title}
-                </p>
+          <WorkspaceCard key={card.title} className="relative p-6">
+            {loading ? (
+              <div className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-white/70">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
               </div>
-              <span
-                className={`text-xs font-medium ${
-                  card.trendPositive ? "text-emerald-600" : "text-rose-600"
-                }`}
-              >
-                {card.trendPositive ? "↓" : "↑"} {card.trend}
-              </span>
+            ) : null}
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-slate-600">{card.title}</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">
+                {card.count}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">{card.subtitle}</p>
             </div>
-            <p className="mt-3 text-3xl font-semibold text-slate-900">
-              {card.count}
-            </p>
-            <p className="mt-2 text-xs text-slate-500">{card.subtitle}</p>
           </WorkspaceCard>
         ))}
       </div>
 
-      {/* Predictive Insights Grid - 2 Columns */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {predictiveInsights.map((insight) => {
-          const Icon = insight.icon;
-          const riskColor = getRiskColor(insight.risk);
-          const riskBg = getRiskBg(insight.risk);
-          const badgeTone = getBadgeTone(insight.risk);
-
-          return (
-            <WorkspaceCard key={insight.id} className="flex flex-col gap-6 p-6">
-              {/* Header: Icon + Title + Badge */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <span
-                    className="flex h-10 w-10 items-center justify-center rounded-full"
-                    style={{ backgroundColor: riskBg }}
-                  >
-                    <Icon
-                      className="h-5 w-5"
-                      strokeWidth={1.5}
-                      style={{ color: riskColor }}
-                    />
-                  </span>
-                  <div>
-                    <h3 className="font-semibold text-slate-900">
-                      {insight.title}
-                    </h3>
-                  </div>
-                </div>
-                <Badge tone={badgeTone}>{insight.risk}</Badge>
-              </div>
-
-              {/* Body: Clinical Prediction */}
-              <p className="text-sm leading-6 text-slate-600">
-                {insight.prediction}
+      {/* Active alerts */}
+      <div>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          Active alerts
+        </h2>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {loading && insightAlerts.length === 0 ? (
+            [...Array.from({ length: 4 })].map((_, i) => (
+              <WorkspaceCard key={i} className="flex h-44 items-center justify-center p-6">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+              </WorkspaceCard>
+            ))
+          ) : insightAlerts.length === 0 ? (
+            <WorkspaceCard className="p-6 lg:col-span-2">
+              <p className="text-sm text-slate-600">
+                No unresolved alerts. Profiles and compute jobs may not have run
+                yet for your population.
               </p>
-
-              {/* Mini Sparkline */}
-              <div className="h-12 w-full">
-                <svg viewBox="0 0 100 40" className="h-full w-full">
-                  <polyline
-                    points={sparklinePoints(insight.sparkline)}
-                    fill="none"
-                    stroke={riskColor}
-                    strokeWidth="1.5"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-              </div>
-
-              {/* Footer: View Patient Link */}
-              <button
-                type="button"
-                className="text-sm font-medium text-[#6B9080] hover:underline"
-              >
-                View Patient
-              </button>
             </WorkspaceCard>
-          );
-        })}
+          ) : (
+            insightAlerts.map((insight, idx) => {
+              const Icon = alertIcon(String(insight.alert_type ?? ""));
+              const sevStyle = severityToRiskStyle(String(insight.severity ?? "Info"));
+
+              return (
+                <WorkspaceCard key={insight._id ?? idx} className="flex flex-col gap-4 p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full"
+                        style={{ backgroundColor: sevStyle.bg }}
+                      >
+                        <Icon
+                          className="h-5 w-5"
+                          strokeWidth={1.5}
+                          style={{ color: sevStyle.color }}
+                        />
+                      </span>
+                      <div>
+                        <h3 className="font-semibold text-slate-900">
+                          {insight.title || insight.alert_type}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {(insight.patient_name || insight.patient_id || "Patient") +
+                            (insight.alert_type
+                              ? ` · ${alertTypeLabel(String(insight.alert_type))}`
+                              : "")}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge tone={sevStyle.tone}>{insight.severity || "Info"}</Badge>
+                  </div>
+                  <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+                    {insight.message ||
+                      "No message. Open the patient profile for detail."}
+                  </p>
+                  {insight.patient_id ? (
+                    <Link
+                      href={`/patients/${insight.patient_id}`}
+                      className="text-sm font-medium text-[#6B9080] hover:underline"
+                    >
+                      View patient
+                    </Link>
+                  ) : null}
+                </WorkspaceCard>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      {/* Care Gaps Table - Full Width */}
+      {/* High-risk patients */}
       <WorkspaceCard className="overflow-hidden">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-slate-900">
-            Care Gaps by Impact
+            Highest-risk patients
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Actionable gaps ranked by clinical priority
+            From predictive risk profiles (High / Critical tiers)
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -343,19 +458,13 @@ export default function AnalyticsPage() {
                   Patient
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Risk Score
+                  Risk score
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Primary Gap
+                  Level
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Predicted Outcome
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Recommended Action
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Impact
+                  Primary alert
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Actions
@@ -363,224 +472,163 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody>
-              {careGapsData.map((row, idx) => {
-                const borderColor =
-                  row.impact === "High"
-                    ? "#C45B5B"
-                    : row.impact === "Medium"
-                      ? "#D4A373"
-                      : "transparent";
-                const impactTone = getBadgeTone(row.impact as string);
+              {loading && topPatients.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin" />
+                  </td>
+                </tr>
+              ) : topPatients.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    No High / Critical profiles yet.
+                  </td>
+                </tr>
+              ) : (
+                topPatients.map((row, idx) => {
+                  const name = row.patient_name ?? "Unknown";
+                  const pid = row.patient_id ?? "";
+                  const level = row.overall_risk_level ?? "—";
+                  const score =
+                    typeof row.overall_risk_score === "number"
+                      ? row.overall_risk_score
+                      : "—";
+                  const impactTone =
+                    level === "Critical"
+                      ? "red"
+                      : level === "High"
+                        ? "red"
+                        : level === "Moderate"
+                          ? "amber"
+                          : "neutral";
+                  const primary = pid ? primaryAlertTitles.get(pid) : undefined;
 
-                return (
-                  <tr
-                    key={idx}
-                    className="border-t border-[#E5E7EB] hover:bg-[#FAFBFC]"
-                    style={{
-                      borderLeftWidth: "3px",
-                      borderLeftColor: borderColor,
-                    }}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <AvatarInitials initials={row.initials} size={32} />
-                        <div>
-                          <p className="font-medium text-slate-900">
-                            {row.name}
-                          </p>
-                          <p className="text-xs text-slate-500">{row.age}y</p>
+                  return (
+                    <tr
+                      key={pid || idx}
+                      className="border-t border-[#E5E7EB] hover:bg-[#FAFBFC]"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <AvatarInitials initials={initialsFromName(name)} size={32} />
+                          <div>
+                            <p className="font-medium text-slate-900">{name}</p>
+                            {pid ? (
+                              <p className="text-xs text-slate-500">{pid}</p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge tone={getBadgeTone(row.riskLevel)}>
-                        {row.riskScore}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{row.gap}</td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {row.outcome}
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{row.action}</td>
-                    <td className="px-6 py-4">
-                      <Badge tone={impactTone}>{row.impact}</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        type="button"
-                        className="text-slate-400 hover:text-slate-600"
-                      >
-                        <MoreVertical
-                          className="h-5 w-5"
-                          strokeWidth={1.5}
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="px-6 py-4">
+                        {typeof score === "number" ? (
+                          <Badge tone={impactTone}>{score}</Badge>
+                        ) : (
+                          <span className="text-slate-500">{score}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge tone={levelToTone(String(level))}>{level}</Badge>
+                      </td>
+                      <td className="max-w-xs truncate px-6 py-4 text-slate-600">
+                        {primary ?? "—"}
+                      </td>
+                      <td className="px-6 py-4">
+                        {pid ? (
+                          <Link
+                            href={`/patients/${pid}`}
+                            className="font-medium text-[#6B9080] hover:underline"
+                          >
+                            Open
+                          </Link>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="ml-2 align-middle text-slate-400 hover:text-slate-600"
+                          aria-label="Row menu placeholder"
+                        >
+                          <MoreVertical className="h-5 w-5" strokeWidth={1.5} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </WorkspaceCard>
 
-      {/* Bottom Charts Row - 2 Columns */}
+      {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Risk Distribution Over Time */}
         <WorkspaceCard className="p-6">
           <h3 className="text-lg font-semibold text-slate-900">
-            Risk Distribution Over Time
+            Risk level distribution
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Patient population stratification over 12 months
+            Snapshot across patients with computed profiles
           </p>
-          <div className="mt-6 h-64 rounded-[12px] bg-[#FAFBFC] p-4">
-            <svg viewBox="0 0 640 240" className="h-full w-full">
-              {/* Stacked area chart - Low (sage) / Moderate (amber) / High (rose) */}
-              <path
-                d="M 20 180 L 100 165 L 180 155 L 260 145 L 340 140 L 420 135 L 500 130 L 580 125 L 620 120"
-                fill="rgba(107, 144, 128, 0.3)"
-                stroke="#6B9080"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M 20 210 L 100 200 L 180 195 L 260 190 L 340 185 L 420 180 L 500 175 L 580 170 L 620 165"
-                fill="rgba(212, 163, 115, 0.3)"
-                stroke="#D4A373"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M 20 230 L 100 225 L 180 220 L 260 215 L 340 210 L 420 205 L 500 200 L 580 195 L 620 190"
-                fill="rgba(196, 91, 91, 0.3)"
-                stroke="#C45B5B"
-                strokeWidth="1.5"
-              />
-              {/* X-axis labels */}
-              {[
-                "Jan",
-                "Feb",
-                "Mar",
-                "Apr",
-                "May",
-                "Jun",
-                "Jul",
-                "Aug",
-                "Sep",
-                "Oct",
-                "Nov",
-                "Dec",
-              ].map((month, idx) => (
-                <text
-                  key={month}
-                  x={20 + (idx * 560) / 11}
-                  y="235"
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="#9CA3AF"
-                >
-                  {month}
-                </text>
-              ))}
-            </svg>
-          </div>
-          <div className="mt-4 flex gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: "#6B9080" }}
-              />
-              <span className="text-slate-600">Low Risk</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: "#D4A373" }}
-              />
-              <span className="text-slate-600">Moderate</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: "#C45B5B" }}
-              />
-              <span className="text-slate-600">High Risk</span>
-            </div>
+          <div className="mt-6 space-y-4">
+            {riskBars.map((row) => {
+              const colors: Record<string, string> = {
+                Low: "#6B9080",
+                Moderate: "#D4A373",
+                High: "#C45B5B",
+                Critical: "#7F1D1D",
+              };
+              const c = colors[row.level] ?? "#94a3b8";
+              return (
+                <div key={row.level}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-700">{row.level}</span>
+                    <span className="text-slate-500">{row.count}</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${row.pct}%`,
+                        backgroundColor: c,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {!loading &&
+            riskBars.every((r) => r.count === 0) ? (
+              <p className="text-sm text-slate-500">No distribution data.</p>
+            ) : null}
           </div>
         </WorkspaceCard>
 
-        {/* Intervention Outcomes */}
         <WorkspaceCard className="p-6">
           <h3 className="text-lg font-semibold text-slate-900">
-            Intervention Outcomes
+            Active alerts by type
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Risk score trajectory: intervened vs. control group
+            Unresolved alert counts by engine
           </p>
-          <div className="mt-6 h-64 rounded-[12px] bg-[#FAFBFC] p-4">
-            <svg viewBox="0 0 640 240" className="h-full w-full">
-              {/* Intervened group (sage line) - downward trend */}
-              <polyline
-                points="20,60 100,65 180,70 260,68 340,60 420,55 500,48 580,42 620,38"
-                fill="none"
-                stroke="#6B9080"
-                strokeWidth="2"
-              />
-              {/* Control group (gray line) - upward trend */}
-              <polyline
-                points="20,100 100,110 180,125 260,140 340,155 420,165 500,175 580,185 620,195"
-                fill="none"
-                stroke="#D1D5DB"
-                strokeWidth="2"
-              />
-              {/* X-axis labels - months */}
-              {["M1", "M2", "M3", "M4", "M5", "M6"].map((month, idx) => (
-                <text
-                  key={month}
-                  x={20 + (idx * 560) / 5}
-                  y="235"
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="#9CA3AF"
-                >
-                  {month}
-                </text>
-              ))}
-              {/* Y-axis labels */}
-              <text
-                x="10"
-                y="40"
-                fontSize="10"
-                fill="#9CA3AF"
-                textAnchor="end"
-              >
-                Low
-              </text>
-              <text
-                x="10"
-                y="210"
-                fontSize="10"
-                fill="#9CA3AF"
-                textAnchor="end"
-              >
-                High
-              </text>
-            </svg>
-          </div>
-          <div className="mt-4 flex gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: "#6B9080" }}
-              />
-              <span className="text-slate-600">With intervention</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: "#D1D5DB" }}
-              />
-              <span className="text-slate-600">Control group</span>
-            </div>
+          <div className="mt-6 space-y-4">
+            {sortedAlertTypes.length === 0 && !loading ? (
+              <p className="text-sm text-slate-500">
+                No active alerts — or profiles have not been computed.
+              </p>
+            ) : (
+              sortedAlertTypes.map((row) => (
+                <div key={row.type}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-700">{alertTypeLabel(row.type)}</span>
+                    <span className="text-slate-500">{row.count}</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+                    <div
+                      className="h-full rounded-full bg-[#6B9080] transition-all"
+                      style={{ width: `${row.barPct}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </WorkspaceCard>
       </div>

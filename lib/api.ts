@@ -22,7 +22,14 @@ async function request(path: string, opts: RequestInit = {}) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     console.error('API Error Response:', { status: res.status, path, body, headers });
-    throw body;
+    const message =
+      typeof (body as { message?: unknown })?.message === "string"
+        ? (body as { message: string }).message
+        : `Request failed (${res.status})`;
+    const error = new Error(message) as Error & { status: number; body: unknown };
+    error.status = res.status;
+    error.body = body;
+    throw error;
   }
   // apiResponse.success wraps payload under `data` so return that if present
   return body.token || body.data || body;
@@ -335,11 +342,16 @@ const toPrescriptionHealthRecordPayload = (payload: PrescriptionPayload): Health
   },
 });
 
-const makeQuery = (params?: Record<string, string | number | undefined>) => {
+const makeQuery = (params?: Record<string, string | number | boolean | undefined>) => {
   if (!params) return "";
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (typeof value !== "undefined" && value !== null && `${value}` !== "") {
+    if (value === undefined || value === null) return;
+    if (typeof value === "boolean") {
+      search.set(key, value ? "true" : "false");
+      return;
+    }
+    if (`${value}` !== "") {
       search.set(key, String(value));
     }
   });
@@ -389,6 +401,60 @@ export const createPrescription = (payload: PrescriptionPayload) =>
 export const createPrescriptionInvoice = (payload: PrescriptionInvoicePayload) =>
   request(`/api/v1/prescription-invoices`, { method: 'POST', body: JSON.stringify(payload) });
 
+/** Predictive care dashboard aggregate row */
+export type RiskBucketRow = { _id: string | null; count: number };
+
+/** Predictive care unresolved alert counts by alert_type */
+export type AlertTypeCount = { _id: string | null; count: number };
+
+export type TopHighRiskPatient = {
+  patient_id?: string;
+  patient_name?: string;
+  overall_risk_score?: number;
+  overall_risk_level?: string;
+};
+
+export type PredictiveDashboardPayload = {
+  riskDistribution?: RiskBucketRow[];
+  alertCounts?: AlertTypeCount[];
+  topHighRisk?: TopHighRiskPatient[];
+};
+
+export type CareAlertSeverity = 'Info' | 'Warning' | 'Critical';
+
+export type CareAlertType =
+  | 'LAB_TREND'
+  | 'CHRONIC_RISK'
+  | 'VACCINATION_GAP'
+  | 'ADHERENCE_GAP'
+  | 'NO_SHOW_RISK'
+  | 'READMISSION_RISK'
+  | 'CRITICAL_LAB';
+
+export type CareAlertItem = {
+  _id?: string;
+  patient_id?: string;
+  patient_name?: string;
+  alert_type?: CareAlertType | string;
+  severity?: CareAlertSeverity | string;
+  title?: string;
+  message?: string;
+  is_read?: boolean;
+  is_resolved?: boolean;
+  triggered_at?: string;
+  metadata?: Record<string, unknown>;
+};
+
+/** GET /predictive-care/analytics/dashboard → { riskDistribution, alertCounts, topHighRisk } */
+export const getPredictiveDashboard = () =>
+  request(`/api/v1/predictive-care/analytics/dashboard`) as Promise<PredictiveDashboardPayload>;
+
+export type PredictiveAlertsQueryParams = Record<string, string | number | boolean | undefined>;
+
+/** GET /predictive-care/alerts — returns `{ alerts }` plus pagination meta is not unwrapped by `request` meta; use alerts list from result */
+export const getPredictiveAlerts = (params?: PredictiveAlertsQueryParams) =>
+  request(`/api/v1/predictive-care/alerts${makeQuery(params)}`) as Promise<{ alerts?: CareAlertItem[] }>;
+
 const api = {
   getPatients,
   getPatient,
@@ -408,6 +474,8 @@ const api = {
   getPrescriptions,
   createPrescription,
   createPrescriptionInvoice,
+  getPredictiveDashboard,
+  getPredictiveAlerts,
   mapAppointmentToUi,
   mapHealthRecordToUi,
   mapHealthRecordToUiPrescription,
