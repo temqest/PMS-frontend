@@ -1,4 +1,10 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "")
+).replace(/\/$/, "");
+
+const DEBUG_API_ERRORS = process.env.NEXT_PUBLIC_DEBUG_API === "true";
 
 function authHeader() {
   try {
@@ -16,23 +22,68 @@ function authHeader() {
   }
 }
 
+async function readResponseBody(res: Response): Promise<unknown> {
+  // 204/205 must not have a body; also treat empty body as "no payload"
+  if (res.status === 204 || res.status === 205) return null;
+
+  const contentType = res.headers.get("content-type") || "";
+
+  // Prefer reading text once, then parsing if applicable.
+  const text = await res.text().catch(() => "");
+  if (!text) return null;
+
+  if (contentType.includes("application/json") || contentType.includes("+json")) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Fall through to return raw text (useful for debugging bad JSON)
+    }
+  }
+
+  return text;
+}
+
 async function request(path: string, opts: RequestInit = {}) {
-  const headers = Object.assign({ 'Content-Type': 'application/json' }, authHeader(), opts.headers || {});
+  const hasBody = typeof opts.body !== "undefined" && opts.body !== null;
+  const isFormData = typeof FormData !== "undefined" && opts.body instanceof FormData;
+  const baseHeaders: Record<string, string> = { Accept: "application/json" };
+  if (hasBody && !isFormData) {
+    baseHeaders["Content-Type"] = "application/json";
+  }
+  const headers = Object.assign(baseHeaders, authHeader(), opts.headers || {});
+
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
-  const body = await res.json().catch(() => ({}));
+  const body = await readResponseBody(res);
   if (!res.ok) {
-    console.error('API Error Response:', { status: res.status, path, body, headers });
+    const messageFromJson =
+      body && typeof body === "object" && "message" in (body as Record<string, unknown>)
+        ? (body as { message?: unknown }).message
+        : undefined;
     const message =
-      typeof (body as { message?: unknown })?.message === "string"
-        ? (body as { message: string }).message
-        : `Request failed (${res.status})`;
-    const error = new Error(message) as Error & { status: number; body: unknown };
+      typeof messageFromJson === "string" && messageFromJson.trim()
+        ? messageFromJson
+        : typeof body === "string" && body.trim()
+          ? body
+          : `Request failed (${res.status})`;
+
+    // Avoid noisy console errors for handled failures.
+    // Enable with NEXT_PUBLIC_DEBUG_API=true when you actually want to see them.
+    if (DEBUG_API_ERRORS) {
+      console.error("API Error Response:", { status: res.status, path, body });
+    }
+
+    const error = new Error(message) as Error & { status: number; body: unknown; path: string };
     error.status = res.status;
     error.body = body;
+    error.path = path;
     throw error;
   }
   // apiResponse.success wraps payload under `data` so return that if present
-  return body.token || body.data || body;
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>;
+    return record.token || record.data || body;
+  }
+  return body;
 }
 
 type AppointmentPayload = {
@@ -420,6 +471,53 @@ export type PredictiveDashboardPayload = {
   topHighRisk?: TopHighRiskPatient[];
 };
 
+export type PredictiveCareRiskFactor = {
+  feature?: string;
+  importance?: number;
+};
+
+export type PredictiveCareProfile = {
+  patient_id?: string;
+  patient_name?: string;
+  overall_risk_level?: string;
+  overall_risk_score?: number;
+  chronic_disease_risk?: number;
+  readmission_risk?: number;
+  no_show_risk?: number;
+  adherence_risk?: number;
+  ml_readmission_prob?: number;
+  ml_readmission_level?: string;
+  ml_chronic_level?: string;
+  ml_chronic_confidence?: number;
+  ml_top_risk_factors?: PredictiveCareRiskFactor[];
+  ml_is_anomaly?: boolean;
+  ml_anomaly_score?: number;
+  ml_computed_at?: string;
+  ml_service_used?: boolean;
+};
+
+export type PredictiveCareLabTrendPoint = {
+  date?: string;
+  value?: number;
+  status?: string;
+};
+
+export type PredictiveCareLabTrend = {
+  test_name?: string;
+  trend_direction?: string;
+  trend_severity?: string;
+  chart_data?: PredictiveCareLabTrendPoint[];
+};
+
+export type PredictiveCareLabForecast = {
+  patient_id?: string;
+  test_name?: string;
+  predicted_value?: number;
+  trend?: string;
+  input_window?: number[];
+  available_tests?: string[];
+};
+
 export type CareAlertSeverity = 'Info' | 'Warning' | 'Critical';
 
 export type CareAlertType =
@@ -450,7 +548,32 @@ export const getPredictiveDashboard = () =>
   request(`/api/v1/predictive-care/analytics/dashboard`) as Promise<PredictiveDashboardPayload>;
 
 export type PredictiveAlertsQueryParams = Record<string, string | number | boolean | undefined>;
+export const getPredictiveCareProfile = (patientId: string) =>
+  request(`/api/v1/predictive-care/profiles/${encodeURIComponent(patientId)}`) as Promise<{
+    profile?: PredictiveCareProfile;
+  }>;
 
+export const computePredictiveCareProfile = (patientId: string) =>
+  request(`/api/v1/predictive-care/profiles/${encodeURIComponent(patientId)}/compute`, {
+    method: 'POST',
+  }) as Promise<{ message?: string; profile?: PredictiveCareProfile }>;
+
+export const getPredictiveCareLabTrends = (patientId: string) =>
+  request(`/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/lab-trends`) as Promise<{
+    trends?: PredictiveCareLabTrend[];
+  }>;
+
+export const getPredictiveCareLabForecast = (
+  patientId: string,
+  testName: string,
+  lastValues: number[] = []
+) =>
+  request(
+    `/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/lab-forecast${makeQuery({
+      test_name: testName,
+      last_values: lastValues.length > 0 ? lastValues.join(',') : undefined,
+    })}`
+  ) as Promise<PredictiveCareLabForecast>;
 /** GET /predictive-care/alerts — returns `{ alerts }` plus pagination meta is not unwrapped by `request` meta; use alerts list from result */
 export const getPredictiveAlerts = (params?: PredictiveAlertsQueryParams) =>
   request(`/api/v1/predictive-care/alerts${makeQuery(params)}`) as Promise<{ alerts?: CareAlertItem[] }>;
@@ -476,6 +599,10 @@ const api = {
   createPrescriptionInvoice,
   getPredictiveDashboard,
   getPredictiveAlerts,
+  getPredictiveCareProfile,
+  computePredictiveCareProfile,
+  getPredictiveCareLabTrends,
+  getPredictiveCareLabForecast,
   mapAppointmentToUi,
   mapHealthRecordToUi,
   mapHealthRecordToUiPrescription,

@@ -32,6 +32,15 @@ export default function PatientsPage() {
   const [patientsState, setPatientsState] = useState<any[]>(initialPatients);
   const [loading, setLoading] = useState(false);
 
+  const extractRows = (resp: unknown, keys: string[]): any[] => {
+    if (Array.isArray(resp)) return resp;
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const rawKey = keys.find((key) => key in record);
+    const raw = rawKey ? record[rawKey] : record.data;
+    return Array.isArray(raw) ? (raw as any[]) : [];
+  };
+
   const filtered = useMemo(() => {
     return patientsState.filter((patient) => {
       const matchesQuery = `${patient.patient_id || patient.id || ''} ${patient.first_name || patient.name || ''} ${patient.contact_number || patient.contact || ''}`.toLowerCase().includes(query.toLowerCase());
@@ -44,10 +53,9 @@ export default function PatientsPage() {
     setLoading(true);
     (async () => {
       try {
-        const resp = await api.getPatients('?limit=50');
-        // resp may be { patients: [...] } or array depending on helper
-        const list = resp.patients || resp.results || resp;
-        setPatientsState(list || []);
+        const resp = (await api.getPatients('?limit=50')) as unknown;
+        const list = extractRows(resp, ["patients", "results"]);
+        setPatientsState(list);
       } catch (e) {
         // ignore for now
       } finally {
@@ -243,13 +251,24 @@ export default function PatientsPage() {
             if (editPatient) {
               const id = editPatient.patient_id || editPatient.id;
               const payload = mapPayload(p);
-              const updated = await api.updatePatient(id, payload);
-              setPatientsState((cur) => cur.map((it) => (it.patient_id === id || it.id === id ? (updated.patient || updated) : it)));
+              const updated = (await api.updatePatient(id, payload)) as unknown;
+              const updatedPayload =
+                updated && typeof updated === "object" && "patient" in (updated as Record<string, unknown>)
+                  ? (updated as { patient?: unknown }).patient
+                  : updated;
+              setPatientsState((cur) =>
+                cur.map((it) =>
+                  it.patient_id === id || it.id === id ? (updatedPayload as any) : it
+                )
+              );
               pushToast({ type: 'success', title: 'Patient updated', message: `${p.firstName} ${p.lastName} updated.` });
             } else {
               const payload = mapPayload(p);
-              const created = await api.createPatient(payload);
-              const payloadBody = created.patient || created;
+              const created = (await api.createPatient(payload)) as unknown;
+              const payloadBody =
+                created && typeof created === "object" && "patient" in (created as Record<string, unknown>)
+                  ? (created as { patient?: unknown }).patient
+                  : created;
               setPatientsState((cur) => [payloadBody, ...cur]);
               pushToast({ type: 'success', title: 'Patient added', message: `${p.firstName} ${p.lastName} added.` });
             }

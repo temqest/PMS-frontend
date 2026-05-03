@@ -113,6 +113,15 @@ export default function RecordsPage() {
   const [selectedRecord, setSelectedRecord] = useState<UiHealthRecord | null>(null);
   const [modalInitialData, setModalInitialData] = useState<Partial<RecordForm> | undefined>(undefined);
 
+  const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
+    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const rawKey = keys.find((key) => key in record);
+    const raw = rawKey ? record[rawKey] : record.data;
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  };
+
   const selectedType = CATEGORY_TO_TYPE[category] || "ALL";
   const patientScopedRecords = useMemo(
     () => (selectedPatient ? records.filter((record) => record.patient.id === selectedPatient.id) : []),
@@ -132,9 +141,9 @@ export default function RecordsPage() {
     setLoading(true);
     setError("");
     try {
-      const resp = await getHealthRecords({ limit: 200 });
-      const rows = resp?.records || [];
-      const list = Array.isArray(rows) ? rows.map(mapHealthRecordToUi) : [];
+      const resp = (await getHealthRecords({ limit: 200 })) as unknown;
+      const rows = extractRows(resp, ["records", "results"]);
+      const list = rows.map(mapHealthRecordToUi);
       setRecords(list);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || "Unable to load health records.";
@@ -148,9 +157,9 @@ export default function RecordsPage() {
     setLoading(true);
     setError("");
     try {
-      const resp = await getHealthRecords({ patient_id: patientId, limit: 200 });
-      const rows = resp?.records || [];
-      const list = Array.isArray(rows) ? rows.map(mapHealthRecordToUi) : [];
+      const resp = (await getHealthRecords({ patient_id: patientId, limit: 200 })) as unknown;
+      const rows = extractRows(resp, ["records", "results"]);
+      const list = rows.map(mapHealthRecordToUi);
       setRecords(list);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || "Unable to load health records.";
@@ -162,8 +171,8 @@ export default function RecordsPage() {
 
   const loadLookupData = async () => {
     try {
-      const patientResp = await getPatients("?limit=200");
-      const patientRows = patientResp?.patients || [];
+      const patientResp = (await getPatients("?limit=200")) as unknown;
+      const patientRows = extractRows(patientResp, ["patients", "results"]);
       const patientOptions: PatientSummary[] = Array.isArray(patientRows)
         ? patientRows
             .map((item: Record<string, unknown>) => ({

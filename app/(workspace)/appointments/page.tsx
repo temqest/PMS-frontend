@@ -38,13 +38,29 @@ export default function AppointmentsPage() {
     [appointments, statusFilter]
   );
 
+  const extractAppointmentRows = (resp: unknown): Record<string, unknown>[] => {
+    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const raw = record.appointments ?? record.results ?? record.data ?? [];
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  };
+
+  const extractPatientRows = (resp: unknown): Record<string, unknown>[] => {
+    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const raw = record.patients ?? record.results ?? record.data ?? [];
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  };
+
   const loadAppointments = async () => {
     setLoading(true);
     setError("");
     try {
-      const resp = await getAppointments();
-      const raw = resp?.appointments || resp?.results || resp || [];
-      const list = Array.isArray(raw) ? raw.map(mapAppointmentToUi) : [];
+      const resp = (await getAppointments()) as unknown;
+      const rows = extractAppointmentRows(resp);
+      const list = rows.map(mapAppointmentToUi);
       setAppointments(list);
     } catch (err: unknown) {
       const e = err as { message?: string };
@@ -56,8 +72,8 @@ export default function AppointmentsPage() {
 
   const loadLookupData = async () => {
     try {
-      const patientResp = await getPatients("?limit=200");
-      const patientRows = patientResp?.patients || [];
+      const patientResp = (await getPatients("?limit=200")) as unknown;
+      const patientRows = extractPatientRows(patientResp);
 
       const patientOptions: PatientOption[] = Array.isArray(patientRows)
         ? patientRows

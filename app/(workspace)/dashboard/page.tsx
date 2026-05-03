@@ -74,6 +74,15 @@ export default function DashboardPage() {
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
   const [nowTs] = useState(() => Date.now());
 
+  const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
+    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const rawKey = keys.find((key) => key in record);
+    const raw = rawKey ? record[rawKey] : record.data;
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -83,7 +92,7 @@ export default function DashboardPage() {
           getHealthRecords({ limit: 200 }),
         ]);
 
-        const patientRows = patientResp?.patients || [];
+        const patientRows = extractRows(patientResp as unknown, ["patients", "results"]);
         const patientOptions: PatientOption[] = Array.isArray(patientRows)
           ? patientRows
               .map((item: Record<string, unknown>) => ({
@@ -94,12 +103,12 @@ export default function DashboardPage() {
           : [];
         setPatients(patientOptions);
 
-        const appointmentRows = appointmentResp?.appointments || [];
+        const appointmentRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
         setAppointments(
           Array.isArray(appointmentRows) ? appointmentRows.map(mapAppointmentToUi) : []
         );
 
-        const recordRows = recordResp?.records || [];
+        const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
         setRecords(Array.isArray(recordRows) ? recordRows.map(mapHealthRecordToUi) : []);
       } catch {
         setPatients([]);

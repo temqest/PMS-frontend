@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useMemo, useState, useEffect } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, MoreVertical, Pencil, Plus } from "lucide-react";
 
 import { useWorkspace } from "../../../components/workspace-shell";
@@ -9,8 +9,16 @@ import { AvatarInitials, Badge, QuickLine, SectionHeader, WorkspaceCard } from "
 import AppointmentModal from "../../../components/modal/AppointmentModal";
 import RecordModal from "../../../components/modal/RecordModal";
 import PrescriptionModal from "../../../components/modal/PrescriptionModal";
+import PredictiveCarePanel from "../../../components/predictive-care/patient-predictive-care-panel";
 import api from "../../../../lib/api";
-import type { UiAppointment, UiHealthRecord, UiPrescription } from "../../../../lib/api";
+import type {
+  PredictiveCareLabForecast,
+  PredictiveCareLabTrend,
+  PredictiveCareProfile,
+  UiAppointment,
+  UiHealthRecord,
+  UiPrescription,
+} from "../../../../lib/api";
 import type { RecordForm } from "../../../components/modal/RecordModal";
 
 type PatientProfile = {
@@ -57,15 +65,115 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<UiPrescription[]>([]);
+  const [predictiveProfile, setPredictiveProfile] = useState<PredictiveCareProfile | null>(null);
+  const [labTrends, setLabTrends] = useState<PredictiveCareLabTrend[]>([]);
+  const [labForecast, setLabForecast] = useState<PredictiveCareLabForecast | null>(null);
+  const [predictiveLoading, setPredictiveLoading] = useState(false);
+  const [predictiveRefreshing, setPredictiveRefreshing] = useState(false);
+  const [predictiveError, setPredictiveError] = useState<string | null>(null);
+  const [predictiveFetchedAt, setPredictiveFetchedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [nowTs] = useState(() => Date.now());
   const resolvedParams = use(params);
   const patientId = resolvedParams.id;
 
+  const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
+    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+    if (!resp || typeof resp !== "object") return [];
+    const record = resp as Record<string, unknown>;
+    const rawKey = keys.find((key) => key in record);
+    const raw = rawKey ? record[rawKey] : record.data;
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  };
+
   // Modal states
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
+
+  const loadPredictiveCare = useCallback(
+    async (forceCompute = false) => {
+      setPredictiveLoading(true);
+      setPredictiveRefreshing(forceCompute);
+      setPredictiveError(null);
+
+      try {
+        let profileResp = null;
+        let trendResp = null;
+
+        if (forceCompute) {
+          await api.computePredictiveCareProfile(patientId).catch((err) => {
+            console.warn('Compute profile error:', err);
+          });
+        }
+
+        // Try to fetch profile; if 404, attempt auto-compute
+        try {
+          profileResp = await api.getPredictiveCareProfile(patientId);
+        } catch (err) {
+          const apiErr = err as { status?: number; message?: string };
+          if (apiErr.status === 404) {
+            // Profile doesn't exist yet, auto-compute on first load
+            if (!forceCompute) {
+              console.log('No profile found; auto-computing...');
+              await api.computePredictiveCareProfile(patientId).catch((computeErr) => {
+                console.warn('Auto-compute failed:', computeErr);
+              });
+              // Retry fetch after compute
+              profileResp = await api.getPredictiveCareProfile(patientId).catch(() => null);
+            }
+          } else {
+            console.warn('Profile fetch error:', err);
+          }
+        }
+
+        // Fetch trends independently; errors don't block the profile
+        trendResp = await api.getPredictiveCareLabTrends(patientId).catch((err) => {
+          console.warn('Lab trends fetch error:', err);
+          return null;
+        });
+
+        const profile = profileResp?.profile || null;
+        const trends = Array.isArray(trendResp?.trends) ? trendResp.trends : [];
+
+        setPredictiveProfile(profile);
+        setLabTrends(trends);
+
+        const primaryTrend = [...trends]
+          .sort((a, b) => (b.chart_data?.length || 0) - (a.chart_data?.length || 0))
+          .find((item) => Array.isArray(item.chart_data) && item.chart_data.length > 0) || null;
+
+        if (primaryTrend?.test_name) {
+          const lastValues = (primaryTrend.chart_data || [])
+            .map((point) => Number(point.value))
+            .filter((value) => Number.isFinite(value))
+            .slice(-3);
+
+          const forecastResp = await api.getPredictiveCareLabForecast(
+            patientId,
+            primaryTrend.test_name,
+            lastValues
+          ).catch(() => null);
+
+          setLabForecast(forecastResp || null);
+        } else {
+          setLabForecast(null);
+        }
+
+        setPredictiveFetchedAt(new Date().toISOString());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to load predictive care data.";
+        setPredictiveError(message);
+        setPredictiveProfile(null);
+        setLabTrends([]);
+        setLabForecast(null);
+      } finally {
+        setPredictiveLoading(false);
+        setPredictiveRefreshing(false);
+      }
+    },
+    [patientId]
+  );
 
   useEffect(() => {
     (async () => {
@@ -79,18 +187,22 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           api.getPrescriptions({ patient_id: id, limit: 200 }),
         ]);
 
-        const patientPayload = patientResp.patient || patientResp;
+        const patientRaw = patientResp as unknown;
+        const patientPayload =
+          patientRaw && typeof patientRaw === "object" && "patient" in (patientRaw as Record<string, unknown>)
+            ? (patientRaw as { patient?: unknown }).patient
+            : patientRaw;
         setPatient(patientPayload as PatientProfile);
 
-        const apptRows = appointmentResp?.appointments || [];
-        setAppointments(Array.isArray(apptRows) ? apptRows.map(api.mapAppointmentToUi) : []);
+        const apptRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
+        setAppointments(apptRows.map(api.mapAppointmentToUi));
 
-        const recordRows = recordResp?.records || [];
-        const mappedRecords = Array.isArray(recordRows) ? recordRows.map(api.mapHealthRecordToUi) : [];
+        const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
+        const mappedRecords = recordRows.map(api.mapHealthRecordToUi);
         setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
 
-        const rxRows = prescriptionResp?.records || [];
-        setPrescriptions(Array.isArray(rxRows) ? rxRows.map(api.mapHealthRecordToUiPrescription) : []);
+        const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
+        setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
       } catch {
         setPatient(null);
       } finally {
@@ -98,6 +210,20 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       }
     })();
   }, [patientId]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadPredictiveCare(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [loadPredictiveCare]);
+
+  // Auto-refresh predictive care whenever user enters the tab.
+  useEffect(() => {
+    if (tab !== "Predictive Care") return;
+    void loadPredictiveCare(false);
+  }, [tab, loadPredictiveCare]);
 
   const display = patient;
   const fullName = `${display?.first_name || ""} ${display?.last_name || ""}`.trim();
@@ -145,7 +271,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
       <WorkspaceCard className="px-6 pt-3">
         <div className="flex gap-6 border-b border-[#E5E7EB]">
-          {(["Overview", "Health Records", "Appointments", "Prescriptions"] as const).map((item) => (
+          {(["Overview", "Predictive Care", "Health Records", "Appointments", "Prescriptions"] as const).map((item) => (
             <button
               key={item}
               type="button"
@@ -272,7 +398,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <Plus className="h-4 w-4" strokeWidth={1.5} />
                   Add Health Record
                 </button>
-              ) : tab === "Prescriptions" ? (
+              ) : tab === "Predictive Care" ? null : tab === "Prescriptions" ? (
                 <button
                   type="button"
                   onClick={() => setIsPrescriptionModalOpen(true)}
@@ -284,7 +410,21 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               ) : null
             }
           />
-          {tab === "Appointments" ? (
+          {tab === "Predictive Care" ? (
+            <div className="mt-5">
+              <PredictiveCarePanel
+                profile={predictiveProfile}
+                labTrends={labTrends}
+                labForecast={labForecast}
+                loading={predictiveLoading}
+                recomputing={predictiveRefreshing}
+                fetchedAt={predictiveFetchedAt}
+                error={predictiveError}
+                onRefresh={() => void loadPredictiveCare(false)}
+                onRecompute={() => void loadPredictiveCare(true)}
+              />
+            </div>
+          ) : tab === "Appointments" ? (
             <div className="mt-5 overflow-hidden rounded-[12px] border border-[#F3F4F6]">
               <table className="w-full text-left">
                 <thead className="bg-[#FAFBFC] text-[12px] uppercase tracking-[0.16em] text-[#9CA3AF]">
@@ -375,9 +515,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             setIsAppointmentModalOpen(false);
             // Refresh appointments
             const appointmentResp = await api.getAppointments({ patient_id: patientId, limit: 200 });
-            const apptRows = appointmentResp?.appointments || [];
-            setAppointments(Array.isArray(apptRows) ? apptRows.map(api.mapAppointmentToUi) : []);
-          } catch (error) {
+            const apptRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
+            setAppointments(apptRows.map(api.mapAppointmentToUi));
+          } catch {
             pushToast({ type: "error", title: "Failed to create appointment", message: "Please try again." });
           }
         }}
@@ -405,10 +545,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             setIsRecordModalOpen(false);
             // Refresh records
             const recordResp = await api.getHealthRecords({ patient_id: patientId, limit: 200 });
-            const recordRows = recordResp?.records || [];
-            const mappedRecords = Array.isArray(recordRows) ? recordRows.map(api.mapHealthRecordToUi) : [];
+            const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
+            const mappedRecords = recordRows.map(api.mapHealthRecordToUi);
             setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
-          } catch (error) {
+          } catch {
             pushToast({ type: "error", title: "Failed to create health record", message: "Please try again." });
           }
         }}
@@ -433,9 +573,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             setIsPrescriptionModalOpen(false);
             // Refresh prescriptions
             const prescriptionResp = await api.getPrescriptions({ patient_id: patientId, limit: 200 });
-            const rxRows = prescriptionResp?.records || [];
-            setPrescriptions(Array.isArray(rxRows) ? rxRows.map(api.mapHealthRecordToUiPrescription) : []);
-          } catch (error) {
+            const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
+            setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
+          } catch {
             pushToast({ type: "error", title: "Failed to create prescription", message: "Please try again." });
           }
         }}
