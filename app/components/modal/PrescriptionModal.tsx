@@ -79,6 +79,7 @@ type PrescriptionModalProps = {
     endDate: string;
   }) => Promise<void> | void;
   preselectedPatient?: { id: string; name: string };
+  patientLocked?: boolean;
   patients?: PatientOption[];
 };
 
@@ -87,6 +88,7 @@ export default function PrescriptionModal({
   onClose,
   onSubmit,
   preselectedPatient,
+  patientLocked = false,
   patients = [],
 }: PrescriptionModalProps) {
   // Form State
@@ -548,13 +550,15 @@ export default function PrescriptionModal({
                         </div>
                         <span>{form.patient?.name}</span>
                       </div>
-                      <button
-                        type="button"
-                        className="prescription-patient-change"
-                        onClick={() => setPatientSearchOpen(true)}
-                      >
-                        Change
-                      </button>
+                      {!patientLocked ? (
+                        <button
+                          type="button"
+                          className="prescription-patient-change"
+                          onClick={() => setPatientSearchOpen(true)}
+                        >
+                          Change
+                        </button>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="prescription-field">

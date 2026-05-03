@@ -308,10 +308,10 @@ export default function RecordsPage() {
             <button
               type="button"
               onClick={() => {
-                if (!filteredPatients.length) return;
-                void selectPatient(filteredPatients[0]);
-                setShowRecordModal(true);
                 setModalMode("create");
+                setSelectedRecord(null);
+                setModalInitialData(undefined);
+                setShowRecordModal(true);
               }}
               className="rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white"
             >

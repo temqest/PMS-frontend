@@ -42,6 +42,7 @@ export default function AppointmentModal({
   onClose,
   onSubmit,
   preselectedPatient,
+  patientLocked = false,
   initialData,
   patients = [],
   mode = "create",
@@ -50,6 +51,7 @@ export default function AppointmentModal({
   onClose: () => void;
   onSubmit: (data: AppointmentData) => Promise<void> | void;
   preselectedPatient?: { id: string; name: string };
+  patientLocked?: boolean;
   initialData?: AppointmentData | null;
   patients?: PatientOption[];
   mode?: "create" | "edit";
@@ -214,38 +216,9 @@ export default function AppointmentModal({
                 {/* Patient Field */}
                 <div className="appointment-field appointment-field-full">
                   <label className="appointment-label">Patient</label>
-                  <div className="appointment-patient-input-wrapper">
-                    <Search
-                      size={18}
-                      strokeWidth={1.5}
-                      className="appointment-input-icon-left"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search by name or patient ID..."
-                      className={`appointment-input appointment-patient-input ${
-                        errors.patient ? "appointment-input-error" : ""
-                      }`}
-                      value={patientQuery}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setPatientQuery(value);
-                        if (!value) {
-                          setForm((prev) => ({ ...prev, patient: null }));
-                        }
-                        setErrors((prev) => ({ ...prev, patient: "" }));
-                      }}
-                      onFocus={() => setPatientOpen(true)}
-                      onBlur={() => setTimeout(() => setPatientOpen(false), 100)}
-                    />
-                    {form.patient && (
-                      <button
-                        type="button"
-                        className="appointment-patient-chip"
-                        onClick={() => {
-                          setForm((prev) => ({ ...prev, patient: null }));
-                        }}
-                      >
+                  {patientLocked && form.patient ? (
+                    <div className="appointment-patient-input-wrapper">
+                      <div className="appointment-patient-chip" aria-label="Selected patient">
                         <div className="appointment-patient-avatar">
                           {form.patient.name
                             .split(" ")
@@ -253,31 +226,76 @@ export default function AppointmentModal({
                             .join("")}
                         </div>
                         <span>{form.patient.name}</span>
-                        <X size={14} strokeWidth={1.5} />
-                      </button>
-                    )}
-                  </div>
-                  {patientOpen && filteredPatients.length > 0 ? (
-                    <div className="mt-2 max-h-40 overflow-auto rounded-[12px] border border-[#E5E7EB] bg-white p-1">
-                      {filteredPatients.map((patient) => (
-                        <button
-                          key={patient.id}
-                          type="button"
-                          className="w-full rounded-[8px] px-3 py-2 text-left text-sm text-slate-700 hover:bg-[#F3F4F6]"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setForm((prev) => ({ ...prev, patient }));
-                            setPatientQuery(patient.name);
-                            setPatientOpen(false);
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="appointment-patient-input-wrapper">
+                        <Search
+                          size={18}
+                          strokeWidth={1.5}
+                          className="appointment-input-icon-left"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Search by name or patient ID..."
+                          className={`appointment-input appointment-patient-input ${
+                            errors.patient ? "appointment-input-error" : ""
+                          }`}
+                          value={patientQuery}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPatientQuery(value);
+                            if (!value) {
+                              setForm((prev) => ({ ...prev, patient: null }));
+                            }
                             setErrors((prev) => ({ ...prev, patient: "" }));
                           }}
-                        >
-                          <span className="font-medium">{patient.name}</span>
-                          <span className="ml-2 text-xs text-slate-400">{patient.id}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
+                          onFocus={() => setPatientOpen(true)}
+                          onBlur={() => setTimeout(() => setPatientOpen(false), 100)}
+                        />
+                        {form.patient && (
+                          <button
+                            type="button"
+                            className="appointment-patient-chip"
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, patient: null }));
+                            }}
+                          >
+                            <div className="appointment-patient-avatar">
+                              {form.patient.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </div>
+                            <span>{form.patient.name}</span>
+                            <X size={14} strokeWidth={1.5} />
+                          </button>
+                        )}
+                      </div>
+                      {patientOpen && filteredPatients.length > 0 ? (
+                        <div className="mt-2 max-h-40 overflow-auto rounded-[12px] border border-[#E5E7EB] bg-white p-1">
+                          {filteredPatients.map((patient) => (
+                            <button
+                              key={patient.id}
+                              type="button"
+                              className="w-full rounded-[8px] px-3 py-2 text-left text-sm text-slate-700 hover:bg-[#F3F4F6]"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev, patient }));
+                                setPatientQuery(patient.name);
+                                setPatientOpen(false);
+                                setErrors((prev) => ({ ...prev, patient: "" }));
+                              }}
+                            >
+                              <span className="font-medium">{patient.name}</span>
+                              <span className="ml-2 text-xs text-slate-400">{patient.id}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                   {errors.patient && (
                     <div className="appointment-error-message">
                       <AlertCircle size={14} strokeWidth={1.5} />

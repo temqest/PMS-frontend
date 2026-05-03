@@ -494,6 +494,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       <AppointmentModal
         isOpen={isAppointmentModalOpen}
         onClose={() => setIsAppointmentModalOpen(false)}
+        preselectedPatient={{ id: patientId, name: fullName }}
+        patientLocked
         onSubmit={async (appointment) => {
           try {
             const payload = {
@@ -525,6 +527,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       <RecordModal
         isOpen={isRecordModalOpen}
         onClose={() => setIsRecordModalOpen(false)}
+        preselectedPatient={{ id: patientId, name: fullName }}
+        patientLocked
         onSubmit={async (record) => {
           try {
             const payload = {
@@ -556,6 +560,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       <PrescriptionModal
         isOpen={isPrescriptionModalOpen}
         onClose={() => setIsPrescriptionModalOpen(false)}
+        preselectedPatient={{ id: patientId, name: fullName }}
+        patientLocked
         onSubmit={async (prescription) => {
           try {
             const payload = {
