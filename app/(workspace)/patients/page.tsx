@@ -43,7 +43,8 @@ export default function PatientsPage() {
 
   const filtered = useMemo(() => {
     return patientsState.filter((patient) => {
-      const matchesQuery = `${patient.patient_id || patient.id || ''} ${patient.first_name || patient.name || ''} ${patient.contact_number || patient.contact || ''}`.toLowerCase().includes(query.toLowerCase());
+      const searchString = `${patient.patient_id || patient.id || ''} ${patient.first_name || patient.name || ''} ${patient.last_name || ''} ${patient.contact_number || patient.contact || ''}`.toLowerCase();
+      const matchesQuery = searchString.includes(query.toLowerCase());
       const matchesStatus = activeStatus === "All" || (patient.status === activeStatus);
       return matchesQuery && matchesStatus;
     });
