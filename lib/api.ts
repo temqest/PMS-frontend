@@ -578,6 +578,11 @@ export const getPredictiveCareLabForecast = (
 export const getPredictiveAlerts = (params?: PredictiveAlertsQueryParams) =>
   request(`/api/v1/predictive-care/alerts${makeQuery(params)}`) as Promise<{ alerts?: CareAlertItem[] }>;
 
+export const getPendingUsers = () => request(`/api/v1/auth/users/pending`);
+export const getAllUsers = () => request(`/api/v1/auth/users`);
+export const activateUser = (userId: string) => request(`/api/v1/auth/users/${userId}/activate`, { method: 'POST' });
+export const deactivateUser = (userId: string) => request(`/api/v1/auth/users/${userId}/deactivate`, { method: 'POST' });
+
 const api = {
   getPatients,
   getPatient,
@@ -603,6 +608,10 @@ const api = {
   computePredictiveCareProfile,
   getPredictiveCareLabTrends,
   getPredictiveCareLabForecast,
+  getPendingUsers,
+  getAllUsers,
+  activateUser,
+  deactivateUser,
   mapAppointmentToUi,
   mapHealthRecordToUi,
   mapHealthRecordToUiPrescription,

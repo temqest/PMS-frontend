@@ -102,8 +102,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         let trendResp = null;
 
         if (forceCompute) {
-          await api.computePredictiveCareProfile(patientId).catch((err) => {
-            console.warn('Compute profile error:', err);
+          await api.computePredictiveCareProfile(patientId).catch(() => {
+            // Silently handle compute errors
           });
         }
 
@@ -115,21 +115,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           if (apiErr.status === 404) {
             // Profile doesn't exist yet, auto-compute on first load
             if (!forceCompute) {
-              console.log('No profile found; auto-computing...');
-              await api.computePredictiveCareProfile(patientId).catch((computeErr) => {
-                console.warn('Auto-compute failed:', computeErr);
+              await api.computePredictiveCareProfile(patientId).catch(() => {
+                // Silently handle auto-compute errors
               });
               // Retry fetch after compute
               profileResp = await api.getPredictiveCareProfile(patientId).catch(() => null);
             }
-          } else {
-            console.warn('Profile fetch error:', err);
           }
+          // Silently handle other fetch errors
         }
 
         // Fetch trends independently; errors don't block the profile
-        trendResp = await api.getPredictiveCareLabTrends(patientId).catch((err) => {
-          console.warn('Lab trends fetch error:', err);
+        trendResp = await api.getPredictiveCareLabTrends(patientId).catch(() => {
+          // Silently handle lab trends fetch errors
           return null;
         });
 

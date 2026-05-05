@@ -14,10 +14,12 @@ import {
   Menu,
   Search,
   Settings,
+  ShieldCheck,
   Users,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { getSessionClaims } from "../../lib/session";
 import {
   createContext,
   useCallback,
@@ -63,7 +65,7 @@ export function useWorkspace() {
   return context;
 }
 
-const navigation = [
+const baseNavigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/patients", label: "Patients", icon: Users },
@@ -71,6 +73,8 @@ const navigation = [
   { href: "/analytics", label: "Analytics", icon: ChartLine },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const adminNavItem = { href: "/admin", label: "Account Management", icon: ShieldCheck };
 
 const shortcuts = [
   { label: "Open patients", href: "/patients", hint: "Patient list" },
@@ -105,6 +109,7 @@ const routeMeta: Record<string, { title: string }> = {
   "/records": { title: "Health Records" },
   "/analytics": { title: "Analytics" },
   "/settings": { title: "Settings" },
+  "/admin": { title: "Account Management" },
 };
 
 let toastId = 1;
@@ -119,7 +124,14 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const [confirm, setConfirm] = useState<ConfirmOptions | null>(null);
   const [query, setQuery] = useState("");
   const [activeResult, setActiveResult] = useState(0);
+  const [isStaff, setIsStaff] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const claims = getSessionClaims();
+    const staffRoles = ['system_admin', 'front_desk', 'physician'];
+    setIsStaff(claims && staffRoles.includes(claims.role || '') ? true : false);
+  }, []);
 
   const activeMeta = pathname.startsWith("/patients/")
     ? { title: "Patient Detail" }
@@ -198,6 +210,8 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
     }
     router.push("/");
   }, [router]);
+
+  const navigation = isStaff ? [...baseNavigation, adminNavItem] : baseNavigation;
 
   return (
     <WorkspaceContext.Provider value={contextValue}>

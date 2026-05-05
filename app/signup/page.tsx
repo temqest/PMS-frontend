@@ -4,20 +4,29 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { AuthButton, AuthField, BrandMark, PasswordStrength } from "../components/clinic-ui";
+import { decodeSessionToken, getPortalPathForRole } from "../../lib/session";
 
 type FormState = {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  phone: string;
+  contactNumber: string;
+  dateOfBirth: string;
+  gender: string;
+  address: string;
   password: string;
   confirmPassword: string;
   terms: boolean;
 };
 
 type TouchedState = {
-  fullName: boolean;
+  firstName: boolean;
+  lastName: boolean;
   email: boolean;
-  phone: boolean;
+  contactNumber: boolean;
+  dateOfBirth: boolean;
+  gender: boolean;
+  address: boolean;
   password: boolean;
   confirmPassword: boolean;
   terms: boolean;
@@ -46,17 +55,25 @@ function getPasswordLabel(score: number) {
 
 export default function SignUpPage() {
   const [form, setForm] = useState<FormState>({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    phone: "",
+    contactNumber: "",
+    dateOfBirth: "",
+    gender: "",
+    address: "",
     password: "",
     confirmPassword: "",
     terms: false,
   });
   const [touched, setTouched] = useState<TouchedState>({
-    fullName: false,
+    firstName: false,
+    lastName: false,
     email: false,
-    phone: false,
+    contactNumber: false,
+    dateOfBirth: false,
+    gender: false,
+    address: false,
     password: false,
     confirmPassword: false,
     terms: false,
@@ -68,17 +85,33 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
 
   const errors = {
-    fullName:
-      touched.fullName && form.fullName.trim().length < 2
-        ? "Please enter your full name."
+    firstName:
+      touched.firstName && form.firstName.trim().length < 2
+        ? "Please enter your first name."
+        : undefined,
+    lastName:
+      touched.lastName && form.lastName.trim().length < 2
+        ? "Please enter your last name."
         : undefined,
     email:
       touched.email && !emailPattern.test(form.email.trim())
         ? "Enter a valid email address."
         : undefined,
-    phone:
-      touched.phone && !phonePattern.test(form.phone.trim())
+    contactNumber:
+      touched.contactNumber && !phonePattern.test(form.contactNumber.trim())
         ? "Enter a valid phone number."
+        : undefined,
+    dateOfBirth:
+      touched.dateOfBirth && !form.dateOfBirth
+        ? "Please enter your date of birth."
+        : undefined,
+    gender:
+      touched.gender && !form.gender
+        ? "Please select a gender."
+        : undefined,
+    address:
+      touched.address && form.address.trim().length < 5
+        ? "Please enter your address."
         : undefined,
     password:
       touched.password && passwordScore < 3
@@ -95,9 +128,13 @@ export default function SignUpPage() {
   };
 
   const valid = {
-    fullName: form.fullName.trim().length >= 2,
+    firstName: form.firstName.trim().length >= 2,
+    lastName: form.lastName.trim().length >= 2,
     email: emailPattern.test(form.email.trim()),
-    phone: phonePattern.test(form.phone.trim()),
+    contactNumber: phonePattern.test(form.contactNumber.trim()),
+    dateOfBirth: Boolean(form.dateOfBirth),
+    gender: Boolean(form.gender),
+    address: form.address.trim().length >= 5,
     password: passwordScore >= 3,
     confirmPassword: form.confirmPassword.length > 0 && form.confirmPassword === form.password,
     terms: form.terms,
@@ -110,14 +147,18 @@ export default function SignUpPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTouched({
-      fullName: true,
+      firstName: true,
+      lastName: true,
       email: true,
-      phone: true,
+      contactNumber: true,
+      dateOfBirth: true,
+      gender: true,
+      address: true,
       password: true,
       confirmPassword: true,
       terms: true,
     });
-    if (!valid.fullName || !valid.email || !valid.password || !valid.confirmPassword || !valid.terms) return;
+    if (!valid.firstName || !valid.lastName || !valid.email || !valid.contactNumber || !valid.dateOfBirth || !valid.gender || !valid.address || !valid.password || !valid.confirmPassword || !valid.terms) return;
 
     (async () => {
       setError(null);
@@ -127,19 +168,30 @@ export default function SignUpPage() {
         const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: form.email, password: form.password, fullName: form.fullName }),
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password,
+            fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+            first_name: form.firstName,
+            last_name: form.lastName,
+            date_of_birth: form.dateOfBirth,
+            gender: form.gender,
+            contact_number: form.contactNumber,
+            address: form.address,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || data.error || (data && data.data && data.data.message) || "Registration failed");
         const token = data.token || (data.data && data.data.token);
         if (token) {
           localStorage.setItem("pms_token", token);
-          (window as any).location.href = "/dashboard";
+          const claims = decodeSessionToken(token);
+          window.location.href = getPortalPathForRole(claims?.role);
         } else {
           throw new Error("No token received");
         }
-      } catch (e: any) {
-        setError(e.message || "An error occurred");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "An error occurred");
       } finally {
         setLoading(false);
       }
@@ -163,16 +215,29 @@ export default function SignUpPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-            <AuthField
-              id="full-name"
-              label="Full name"
-              value={form.fullName}
-              onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
-              onBlur={() => markTouched("fullName")}
-              valid={touched.fullName && valid.fullName}
-              error={errors.fullName}
-              autoComplete="name"
-            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <AuthField
+                id="first-name"
+                label="First name"
+                value={form.firstName}
+                onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))}
+                onBlur={() => markTouched("firstName")}
+                valid={touched.firstName && valid.firstName}
+                error={errors.firstName}
+                autoComplete="given-name"
+              />
+
+              <AuthField
+                id="last-name"
+                label="Last name"
+                value={form.lastName}
+                onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))}
+                onBlur={() => markTouched("lastName")}
+                valid={touched.lastName && valid.lastName}
+                error={errors.lastName}
+                autoComplete="family-name"
+              />
+            </div>
 
             <AuthField
               id="email"
@@ -190,13 +255,55 @@ export default function SignUpPage() {
               id="phone"
               label="Phone number"
               type="tel"
-              value={form.phone}
-              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-              onBlur={() => markTouched("phone")}
-              valid={touched.phone && valid.phone}
-              error={errors.phone}
+              value={form.contactNumber}
+              onChange={(event) => setForm((current) => ({ ...current, contactNumber: event.target.value }))}
+              onBlur={() => markTouched("contactNumber")}
+              valid={touched.contactNumber && valid.contactNumber}
+              error={errors.contactNumber}
               autoComplete="tel"
             />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <AuthField
+                id="date-of-birth"
+                label="Date of birth"
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(event) => setForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
+                onBlur={() => markTouched("dateOfBirth")}
+                valid={touched.dateOfBirth && valid.dateOfBirth}
+                error={errors.dateOfBirth}
+                autoComplete="bday"
+              />
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Gender</label>
+                <select
+                  value={form.gender}
+                  onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}
+                  onBlur={() => markTouched("gender")}
+                  className="h-11 w-full rounded-[12px] border border-[var(--border-soft)] bg-white px-4 text-sm text-slate-900 outline-none transition-colors focus:border-[var(--accent-sage)]"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                {errors.gender ? <p className="text-sm text-[#EF4444]">{errors.gender}</p> : null}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-slate-700">Address</label>
+              <textarea
+                value={form.address}
+                onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+                onBlur={() => markTouched("address")}
+                rows={3}
+                className="mt-2 w-full rounded-[12px] border border-[var(--border-soft)] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-[var(--accent-sage)]"
+              />
+              {errors.address ? <p className="mt-2 text-sm text-[#EF4444]">{errors.address}</p> : null}
+            </div>
 
             <div className="space-y-3">
               <AuthField

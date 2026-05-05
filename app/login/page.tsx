@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { AuthButton, AuthField, BrandMark } from "../components/clinic-ui";
+import { decodeSessionToken, getPortalPathForRole } from "../../lib/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,15 +30,14 @@ export default function LoginPage() {
       const token = data.token || (data.data && data.data.token);
       if (token) {
         localStorage.setItem("pms_token", token);
-        console.log("Token stored successfully in localStorage");
-        router.push("/dashboard");
+        const claims = decodeSessionToken(token);
+        router.push(getPortalPathForRole(claims?.role));
       } else {
-        console.error("No token in response:", data);
         throw new Error("No token received");
       }
-    } catch (e: any) {
-      console.error("Login error:", e);
-      setError(e.message || "An error occurred");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "An error occurred";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/portal")}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[12px] border border-[var(--border-soft)] bg-white text-sm font-medium text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent-blue)] hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               Continue with SSO
