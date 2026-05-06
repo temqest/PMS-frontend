@@ -1,20 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { DayPicker } from "react-day-picker";
-import "react-day-picker/dist/style.css";
-import { format, parse } from "date-fns";
 import {
   User,
   Phone,
   Mail,
-  Calendar as CalendarIcon,
   ChevronDown,
   X,
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
 import "./PatientModal.css";
+import SharedDatePicker from "../SharedDatePicker";
 
 type PatientData = {
   id?: string;
@@ -97,7 +94,6 @@ export default function PatientModal({
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [allergyInput, setAllergyInput] = useState("");
   const [medicationInput, setMedicationInput] = useState("");
-  const [showCalendar, setShowCalendar] = useState(false);
 
   // Track dirty state
   useEffect(() => {
@@ -408,38 +404,16 @@ export default function PatientModal({
                 <div className="patient-field-row patient-field-row-2">
                   <div className="patient-field">
                     <label className="patient-label">Date of Birth</label>
-                    <div className="relative w-full">
-                      <button
-                        type="button"
-                        onClick={() => setShowCalendar(!showCalendar)}
-                        className={`w-full patient-input cursor-pointer flex items-center justify-between pr-4 ${
-                          errors.dateOfBirth ? "patient-input-error" : ""
-                        }`}
-                      >
-                        <span className="flex-1 text-left">{form.dateOfBirth ? format(parse(form.dateOfBirth, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy') : "Select date"}</span>
-                        <CalendarIcon size={18} strokeWidth={1.5} className="text-[#D1D5DB] flex-shrink-0 ml-2" />
-                      </button>
-                      {showCalendar && (
-                        <div className="absolute top-full left-0 z-50 mt-2 rounded-lg border border-[#E5E7EB] bg-white shadow-lg p-3">
-                          <DayPicker
-                            mode="single"
-                            selected={form.dateOfBirth ? parse(form.dateOfBirth, 'yyyy-MM-dd', new Date()) : undefined}
-                            onSelect={(date) => {
-                              if (date) {
-                                const isoDate = format(date, 'yyyy-MM-dd');
-                                setForm((prev) => ({
-                                  ...prev,
-                                  dateOfBirth: isoDate,
-                                }));
-                                setErrors((prev) => ({ ...prev, dateOfBirth: "" }));
-                              }
-                              setShowCalendar(false);
-                            }}
-                            disabled={(date) => date > new Date()}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <SharedDatePicker
+                      ariaLabel="Date of birth"
+                      value={form.dateOfBirth || ""}
+                      onChange={(dateOfBirth) => {
+                        setForm((prev) => ({ ...prev, dateOfBirth }));
+                        setErrors((prev) => ({ ...prev, dateOfBirth: "" }));
+                      }}
+                      error={Boolean(errors.dateOfBirth)}
+                      disableFuture
+                    />
                     {errors.dateOfBirth && (
                       <div className="patient-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />

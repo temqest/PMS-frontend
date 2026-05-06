@@ -457,13 +457,9 @@ export const updateHealthRecord = (id: string, payload: Partial<HealthRecordPayl
 export const deleteHealthRecord = (id: string) =>
   request(`/api/v1/health-records/${id}`, { method: "DELETE" });
 export const getPrescriptionMedicines = async (): Promise<PrescriptionMedicine[]> => {
-  const res = await fetch("/api/prescription-medicines", {
-    headers: { Accept: "application/json" },
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw result;
-  }
+  const result = await request(`/api/v1/health-records/prescription-medicines`) as
+    | PrescriptionMedicine[]
+    | { data?: PrescriptionMedicine[] };
   if (Array.isArray(result)) return result;
   if (Array.isArray(result?.data)) return result.data;
   return [];

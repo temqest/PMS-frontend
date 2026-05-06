@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
-import { AuthButton, AuthField, BrandMark, PasswordStrength } from "../components/clinic-ui";
+import { AuthButton, AuthField, AuthPasswordField, BrandMark, PasswordStrength } from "../components/clinic-ui";
+import SharedDatePicker from "../components/SharedDatePicker";
 import { decodeSessionToken, getPortalPathForRole } from "../../lib/session";
 
 type FormState = {
@@ -219,6 +220,7 @@ export default function SignUpPage() {
               <AuthField
                 id="first-name"
                 label="First name"
+                placeholder="Enter your first name"
                 value={form.firstName}
                 onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))}
                 onBlur={() => markTouched("firstName")}
@@ -230,6 +232,7 @@ export default function SignUpPage() {
               <AuthField
                 id="last-name"
                 label="Last name"
+                placeholder="Enter your last name"
                 value={form.lastName}
                 onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))}
                 onBlur={() => markTouched("lastName")}
@@ -243,6 +246,7 @@ export default function SignUpPage() {
               id="email"
               label="Email address"
               type="email"
+              placeholder="name@example.com"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
               onBlur={() => markTouched("email")}
@@ -255,6 +259,7 @@ export default function SignUpPage() {
               id="phone"
               label="Phone number"
               type="tel"
+              placeholder="09123456789"
               value={form.contactNumber}
               onChange={(event) => setForm((current) => ({ ...current, contactNumber: event.target.value }))}
               onBlur={() => markTouched("contactNumber")}
@@ -264,17 +269,20 @@ export default function SignUpPage() {
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <AuthField
-                id="date-of-birth"
-                label="Date of birth"
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(event) => setForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
-                onBlur={() => markTouched("dateOfBirth")}
-                valid={touched.dateOfBirth && valid.dateOfBirth}
-                error={errors.dateOfBirth}
-                autoComplete="bday"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700" htmlFor="date-of-birth">
+                  Date of birth
+                </label>
+                <SharedDatePicker
+                  ariaLabel="Date of birth"
+                  value={form.dateOfBirth}
+                  onChange={(dateOfBirth) => setForm((current) => ({ ...current, dateOfBirth }))}
+                  onBlur={() => markTouched("dateOfBirth")}
+                  error={Boolean(errors.dateOfBirth)}
+                  variant="auth"
+                />
+                {errors.dateOfBirth ? <p className="text-sm text-[#EF4444]">{errors.dateOfBirth}</p> : null}
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Gender</label>
@@ -296,6 +304,7 @@ export default function SignUpPage() {
             <div>
               <label className="text-sm font-medium text-slate-700">Address</label>
               <textarea
+                placeholder="Enter your address"
                 value={form.address}
                 onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
                 onBlur={() => markTouched("address")}
@@ -306,10 +315,10 @@ export default function SignUpPage() {
             </div>
 
             <div className="space-y-3">
-              <AuthField
+              <AuthPasswordField
                 id="password"
                 label="Password"
-                type="password"
+                placeholder="Enter your password"
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 onBlur={() => markTouched("password")}
@@ -320,10 +329,10 @@ export default function SignUpPage() {
               <PasswordStrength score={passwordScore} label={passwordLabel} />
             </div>
 
-            <AuthField
+            <AuthPasswordField
               id="confirm-password"
               label="Confirm password"
-              type="password"
+              placeholder="Confirm your password"
               value={form.confirmPassword}
               onChange={(event) =>
                 setForm((current) => ({ ...current, confirmPassword: event.target.value }))
@@ -361,7 +370,7 @@ export default function SignUpPage() {
             </div>
 
             <AuthButton type="submit" className="w-full">
-              {loading ? 'Creating…' : 'Create account'}
+              {loading ? "Creating..." : "Create account"}
             </AuthButton>
 
             {error ? <p className="mt-2 text-sm text-[#EF4444] text-center">{error}</p> : null}

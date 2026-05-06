@@ -1,18 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pill,
   X,
   CheckCircle,
   AlertCircle,
   ChevronDown,
-  Calendar,
   Search,
   Trash2,
 } from "lucide-react";
 import "./PrescriptionModal.css";
 import { getPrescriptionMedicines, type PatientOption } from "../../../lib/api";
+import SharedDatePicker from "../SharedDatePicker";
 
 // =============================================================================
 // TYPES
@@ -126,8 +126,6 @@ export default function PrescriptionModal({
   // UI State
   const [patientSearchOpen, setPatientSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState(preselectedPatient?.name || "");
-  const startDateRef = useRef<HTMLInputElement>(null);
-  const endDateRef = useRef<HTMLInputElement>(null);
 
   // Dirty state tracking
   const isDirty = useMemo(
@@ -166,15 +164,6 @@ export default function PrescriptionModal({
     setShowInventoryModal(false);
     setErrors({});
   }, [preselectedPatient]);
-
-  const openDatePicker = (input: HTMLInputElement | null) => {
-    if (!input) return;
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-      return;
-    }
-    input.focus();
-  };
 
   // =============================================================================
   // EFFECTS - Load medicines when modal opens
@@ -944,34 +933,21 @@ export default function PrescriptionModal({
                 <div className="prescription-field-row prescription-field-row-2">
                   <div className="prescription-field">
                     <label className="prescription-label">Start Date *</label>
-                    <div className="prescription-date-input-wrapper">
-                      <input
-                        ref={startDateRef}
-                        type="date"
-                        className={`prescription-input ${
-                          errors.startDate ? "prescription-input-error" : ""
-                        }`}
-                        value={form.startDate || ""}
-                        onChange={(e) => {
-                          setForm((prev) => ({
-                            ...prev,
-                            startDate: e.target.value,
-                          }));
-                          setErrors((prev) => ({
-                            ...prev,
-                            startDate: "",
-                          }));
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="prescription-input-icon-right"
-                        onClick={() => openDatePicker(startDateRef.current)}
-                        aria-label="Open start date calendar"
-                      >
-                        <Calendar size={16} strokeWidth={1.5} />
-                      </button>
-                    </div>
+                    <SharedDatePicker
+                      ariaLabel="Prescription start date"
+                      value={form.startDate || ""}
+                      onChange={(startDate) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          startDate,
+                        }));
+                        setErrors((prev) => ({
+                          ...prev,
+                          startDate: "",
+                        }));
+                      }}
+                      error={Boolean(errors.startDate)}
+                    />
                     {errors.startDate && (
                       <div className="prescription-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />
@@ -984,34 +960,21 @@ export default function PrescriptionModal({
                     <label className="prescription-label">
                       End Date (Optional)
                     </label>
-                    <div className="prescription-date-input-wrapper">
-                      <input
-                        ref={endDateRef}
-                        type="date"
-                        className={`prescription-input ${
-                          errors.endDate ? "prescription-input-error" : ""
-                        }`}
-                        value={form.endDate || ""}
-                        onChange={(e) => {
-                          setForm((prev) => ({
-                            ...prev,
-                            endDate: e.target.value,
-                          }));
-                          setErrors((prev) => ({
-                            ...prev,
-                            endDate: "",
-                          }));
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="prescription-input-icon-right"
-                        onClick={() => openDatePicker(endDateRef.current)}
-                        aria-label="Open end date calendar"
-                      >
-                        <Calendar size={16} strokeWidth={1.5} />
-                      </button>
-                    </div>
+                    <SharedDatePicker
+                      ariaLabel="Prescription end date"
+                      value={form.endDate || ""}
+                      onChange={(endDate) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          endDate,
+                        }));
+                        setErrors((prev) => ({
+                          ...prev,
+                          endDate: "",
+                        }));
+                      }}
+                      error={Boolean(errors.endDate)}
+                    />
                     {errors.endDate && (
                       <div className="prescription-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />

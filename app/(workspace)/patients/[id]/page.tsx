@@ -10,6 +10,7 @@ import { AvatarInitials, Badge, QuickLine, SectionHeader, WorkspaceCard } from "
 import AppointmentModal from "../../../components/modal/AppointmentModal";
 import RecordModal from "../../../components/modal/RecordModal";
 import PrescriptionModal from "../../../components/modal/PrescriptionModal";
+import { PatientPageSkeleton } from "../../../components/patient-detail-skeleton";
 import PredictiveCarePanel from "../../../components/predictive-care/patient-predictive-care-panel";
 import api from "../../../../lib/api";
 import type {
@@ -50,6 +51,8 @@ type PatientProfile = {
   status?: string;
 };
 
+const tabPanelShellClassName = "tab-panel-enter min-w-0 overflow-x-hidden min-h-[44rem] lg:min-h-[54rem]";
+
 const recordSummary = (record: RecordForm) => {
   if (record.recordType === "Visit") return record.visitAssessment || record.visitReason;
   if (record.recordType === "Lab Result") return record.labNotes;
@@ -68,10 +71,22 @@ const recordTitle = (record: RecordForm) => {
   return record.noteType;
 };
 
+const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
+  if (Array.isArray(resp)) return resp as Record<string, unknown>[];
+  if (!resp || typeof resp !== "object") return [];
+  const record = resp as Record<string, unknown>;
+  const rawKey = keys.find((key) => key in record);
+  const raw = rawKey ? record[rawKey] : record.data;
+  return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+};
+
+const patientTabs = ["Overview", "Predictive Care", "Health Records", "Appointments", "Prescriptions"] as const;
+type PatientTab = (typeof patientTabs)[number];
+
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { pushToast, requestConfirm } = useWorkspace();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState(() => (searchParams.get("tab") === "predictive" ? "Predictive Care" : "Overview"));
+  const [tab, setTab] = useState<PatientTab>(() => (searchParams.get("tab") === "predictive" ? "Predictive Care" : "Overview"));
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
@@ -88,23 +103,55 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [predictiveRadar, setPredictiveRadar] = useState<PredictiveCareRadarPayload | null>(null);
   const [predictiveTimeline, setPredictiveTimeline] = useState<PredictiveCareTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [nowTs] = useState(() => Date.now());
   const resolvedParams = use(params);
   const patientId = resolvedParams.id;
-
-  const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
-    if (Array.isArray(resp)) return resp as Record<string, unknown>[];
-    if (!resp || typeof resp !== "object") return [];
-    const record = resp as Record<string, unknown>;
-    const rawKey = keys.find((key) => key in record);
-    const raw = rawKey ? record[rawKey] : record.data;
-    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
-  };
 
   // Modal states
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
+
+  const loadPatientData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const id = patientId;
+      const [patientResp, appointmentResp, recordResp, prescriptionResp] = await Promise.all([
+        api.getPatient(id),
+        api.getAppointments({ patient_id: id, limit: 200 }),
+        api.getHealthRecords({ patient_id: id, limit: 200 }),
+        api.getPrescriptions({ patient_id: id, limit: 200 }),
+      ]);
+
+      const patientRaw = patientResp as unknown;
+      const patientPayload =
+        patientRaw && typeof patientRaw === "object" && "patient" in (patientRaw as Record<string, unknown>)
+          ? (patientRaw as { patient?: unknown }).patient
+          : patientRaw;
+      setPatient(patientPayload as PatientProfile);
+
+      const apptRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
+      setAppointments(apptRows.map(api.mapAppointmentToUi));
+
+      const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
+      const mappedRecords = recordRows.map(api.mapHealthRecordToUi);
+      setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
+
+      const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
+      setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
+    } catch (error) {
+      const apiError = error as { status?: number; message?: string };
+      setPatient(null);
+      setAppointments([]);
+      setRecords([]);
+      setPrescriptions([]);
+      setLoadError(apiError.status === 404 ? null : apiError.message || "Unable to load patient profile.");
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId]);
 
   const loadPredictiveCare = useCallback(
     async (forceCompute = false) => {
@@ -211,40 +258,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   );
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const id = patientId;
-        const [patientResp, appointmentResp, recordResp, prescriptionResp] = await Promise.all([
-          api.getPatient(id),
-          api.getAppointments({ patient_id: id, limit: 200 }),
-          api.getHealthRecords({ patient_id: id, limit: 200 }),
-          api.getPrescriptions({ patient_id: id, limit: 200 }),
-        ]);
+    const timeout = window.setTimeout(() => {
+      void loadPatientData();
+    }, 0);
 
-        const patientRaw = patientResp as unknown;
-        const patientPayload =
-          patientRaw && typeof patientRaw === "object" && "patient" in (patientRaw as Record<string, unknown>)
-            ? (patientRaw as { patient?: unknown }).patient
-            : patientRaw;
-        setPatient(patientPayload as PatientProfile);
-
-        const apptRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
-        setAppointments(apptRows.map(api.mapAppointmentToUi));
-
-        const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
-        const mappedRecords = recordRows.map(api.mapHealthRecordToUi);
-        setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
-
-        const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
-        setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
-      } catch {
-        setPatient(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [patientId]);
+    return () => window.clearTimeout(timeout);
+  }, [loadPatientData]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -278,7 +297,29 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     return future[0] || null;
   }, [appointments, nowTs]);
 
-  if (loading) return <div className="p-6">Loading patient profile...</div>;
+  if (loading) return <PatientPageSkeleton activeTab={tab} />;
+  if (loadError) {
+    return (
+      <div className="space-y-6 pb-8">
+        <div className="text-sm text-slate-500">Dashboard &gt; Patients &gt; Patient Profile</div>
+        <WorkspaceCard className="p-6">
+          <div className="space-y-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Unable to load patient profile</h1>
+            <p className="max-w-xl text-sm leading-6 text-slate-500">{loadError}</p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => void loadPatientData()}
+                className="inline-flex items-center rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </WorkspaceCard>
+      </div>
+    );
+  }
   if (!display) return <div className="p-6">Patient not found.</div>;
 
   return (
@@ -307,26 +348,31 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </WorkspaceCard>
 
-      <WorkspaceCard className="px-6 pt-3">
-        <div className="flex gap-6 border-b border-[#E5E7EB]">
-          {(["Overview", "Predictive Care", "Health Records", "Appointments", "Prescriptions"] as const).map((item) => (
+      <WorkspaceCard className="overflow-hidden px-6 pt-3">
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max gap-6 border-b border-[#E5E7EB]">
+          {patientTabs.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setTab(item)}
-              className={`relative px-1 py-4 text-sm font-medium transition-colors ${tab === item ? "text-[var(--accent-sage)]" : "text-slate-500"}`}
+              className={`relative shrink-0 whitespace-nowrap px-1 py-4 text-sm font-medium transition-colors ${tab === item ? "text-[var(--accent-sage)]" : "text-slate-500"}`}
             >
               {item}
-              {tab === item ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--accent-sage)]" /> : null}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-x-0 bottom-0 h-0.5 bg-[var(--accent-sage)] transition-opacity duration-150 ${tab === item ? "opacity-100" : "opacity-0"}`}
+              />
             </button>
           ))}
+        </div>
         </div>
       </WorkspaceCard>
 
       {tab === "Overview" ? (
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <div className={`${tabPanelShellClassName} grid gap-6 lg:grid-cols-[2fr_1fr]`}>
           <div className="space-y-6">
-            <WorkspaceCard className="p-6">
+          <WorkspaceCard className="h-full p-6">
               <SectionHeader title="Personal Info" action={<button className="text-sm text-[var(--accent-sage)] hover:underline">Edit</button>} />
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <QuickLine label="Date of Birth" value={display.date_of_birth ? new Date(display.date_of_birth).toLocaleDateString() : "-"} />
@@ -416,9 +462,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </WorkspaceCard>
           </div>
-        </div>
-      ) : (
-        <WorkspaceCard className="p-6">
+          </div>
+          ) : (
+            <div className={tabPanelShellClassName}>
+            <WorkspaceCard className="h-full min-w-0 p-6">
           <SectionHeader 
             title={tab}
             action={
@@ -537,6 +584,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             </div>
           )}
         </WorkspaceCard>
+        </div>
       )}
       <AppointmentModal
         isOpen={isAppointmentModalOpen}

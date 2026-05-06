@@ -1,9 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { DayPicker } from "react-day-picker";
-import "react-day-picker/dist/style.css";
-import { format, parse } from "date-fns";
 import {
   Calendar as CalendarIcon,
   Search,
@@ -14,6 +11,7 @@ import {
 } from "lucide-react";
 import "./AppointmentModal.css";
 import type { PatientOption } from "../../../lib/api";
+import SharedDatePicker from "../SharedDatePicker";
 
 export type AppointmentData = {
   patient?: { id: string; name: string } | null;
@@ -83,7 +81,6 @@ export default function AppointmentModal({
   const [submitError, setSubmitError] = useState("");
   const [patientQuery, setPatientQuery] = useState(initialData?.patient?.name || preselectedPatient?.name || "");
   const [patientOpen, setPatientOpen] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
   const isDirty = useMemo(
     () =>
       !!(
@@ -308,36 +305,15 @@ export default function AppointmentModal({
                 <div className="appointment-field-row appointment-field-row-3">
                   <div className="appointment-field">
                     <label className="appointment-label">Date</label>
-                    <div className="relative w-full">
-                      <button
-                        type="button"
-                        onClick={() => setShowCalendar(!showCalendar)}
-                        className={`w-full appointment-input cursor-pointer flex items-center justify-between pr-4 ${
-                          errors.date ? "appointment-input-error" : ""
-                        }`}
-                      >
-                        <span className="flex-1 text-left">
-                          {form.date ? format(parse(form.date, "yyyy-MM-dd", new Date()), "MMM d, yyyy") : "Select date"}
-                        </span>
-                        <CalendarIcon size={18} strokeWidth={1.5} className="text-[#D1D5DB] flex-shrink-0 ml-2" />
-                      </button>
-                      {showCalendar && (
-                        <div className="absolute top-full left-0 z-50 mt-2 rounded-lg border border-[#E5E7EB] bg-white shadow-lg p-3">
-                          <DayPicker
-                            mode="single"
-                            selected={form.date ? parse(form.date, "yyyy-MM-dd", new Date()) : undefined}
-                            onSelect={(date) => {
-                              if (date) {
-                                const isoDate = format(date, "yyyy-MM-dd");
-                                setForm((prev) => ({ ...prev, date: isoDate }));
-                                setErrors((prev) => ({ ...prev, date: "" }));
-                              }
-                              setShowCalendar(false);
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <SharedDatePicker
+                      ariaLabel="Appointment date"
+                      value={form.date || ""}
+                      onChange={(date) => {
+                        setForm((prev) => ({ ...prev, date }));
+                        setErrors((prev) => ({ ...prev, date: "" }));
+                      }}
+                      error={Boolean(errors.date)}
+                    />
                     {errors.date && (
                       <div className="appointment-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />

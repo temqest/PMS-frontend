@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 type InventoryItem = {
   id?: unknown;
@@ -21,7 +21,7 @@ const normalizeMedicine = (item: InventoryItem) => ({
   status: String(item.status || "").trim(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const inventoryUrl = process.env.PRESCRIPTION_API_URL;
   const inventoryApiKey = process.env.PRESCRIPTION_API_KEY;
   const inventoryBearerToken = process.env.PRESCRIPTION_API_BEARER_TOKEN;
@@ -35,11 +35,14 @@ export async function GET() {
 
   try {
     const upstreamHeaders: HeadersInit = { Accept: "application/json" };
-    if (inventoryApiKey) {
-      upstreamHeaders["x-api-key"] = inventoryApiKey;
-    }
-    if (inventoryBearerToken) {
+    const incomingAuthorization = request.headers.get("authorization")?.trim();
+
+    if (incomingAuthorization) {
+      upstreamHeaders["Authorization"] = incomingAuthorization;
+    } else if (inventoryBearerToken) {
       upstreamHeaders["Authorization"] = `Bearer ${inventoryBearerToken}`;
+    } else if (inventoryApiKey) {
+      upstreamHeaders["x-api-key"] = inventoryApiKey;
     }
 
     const response = await fetch(inventoryUrl, {

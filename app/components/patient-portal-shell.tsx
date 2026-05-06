@@ -105,7 +105,7 @@ export default function PatientPortalShell({ children }: { children: ReactNode }
             })}
           </nav>
 
-          <div className="mt-auto rounded-[20px] border border-[#E5E7EB] bg-[#FAFBFC] p-4">
+          <div className="mt-6 rounded-[20px] border border-[#E5E7EB] bg-[#FAFBFC] p-4">
             <p className="text-xs uppercase tracking-[0.26em] text-slate-400">Signed in as</p>
             <p className="mt-2 text-sm font-medium text-slate-900">{displayName}</p>
             <p className="mt-1 text-sm text-slate-500">{activeLabel}</p>

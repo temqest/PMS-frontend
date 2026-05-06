@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
-import type { ComponentPropsWithoutRef } from "react";
+import { useState, type ComponentPropsWithoutRef } from "react";
 import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
+  Eye,
+  EyeOff,
   type LucideIcon,
 } from "lucide-react";
 
@@ -172,6 +176,70 @@ export function AuthField({
             )}
           </span>
         ) : null}
+      </div>
+      {error ? <p className="mt-2 text-sm text-[#EF4444]">{error}</p> : null}
+    </label>
+  );
+}
+
+export function AuthPasswordField({
+  label,
+  error,
+  valid,
+  id,
+  className,
+  ...props
+}: ComponentPropsWithoutRef<"input"> & {
+  label: string;
+  error?: string;
+  valid?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  const showStatus = Boolean(valid || error);
+
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <div className="relative">
+        <input
+          id={id}
+          aria-invalid={Boolean(error)}
+          type={visible ? "text" : "password"}
+          className={mergeClasses(
+            "peer h-12 w-full border-0 border-b border-[var(--border-soft)] bg-transparent px-0 pr-20 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none transition-all duration-200 focus:border-[var(--accent-blue)] focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+            className,
+          )}
+          {...props}
+        />
+
+        <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          {showStatus ? (
+            <span
+              aria-hidden="true"
+              className={mergeClasses(
+                "pointer-events-none",
+                error ? "text-[#EF4444]" : "text-[var(--accent-sage)]",
+              )}
+            >
+              {error ? (
+                <AlertCircle className="h-5 w-5" strokeWidth={1.5} />
+              ) : (
+                <CheckCircle2 className="h-5 w-5" strokeWidth={1.5} />
+              )}
+            </span>
+          ) : null}
+
+          <button
+            type="button"
+            aria-label={visible ? "Hide password" : "Show password"}
+            aria-pressed={visible}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setVisible((current) => !current)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-[var(--surface-soft)] hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          >
+            {visible ? <EyeOff className="h-5 w-5" strokeWidth={1.5} /> : <Eye className="h-5 w-5" strokeWidth={1.5} />}
+          </button>
+        </div>
       </div>
       {error ? <p className="mt-2 text-sm text-[#EF4444]">{error}</p> : null}
     </label>

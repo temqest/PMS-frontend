@@ -733,7 +733,7 @@ export default function AppointmentsPage() {
                     return (
                       <div
                         key={dayKey}
-                        className={`rounded-[16px] border p-4 ${
+                        className={`overflow-hidden rounded-[16px] border p-4 ${
                           isSelected
                             ? "border-[var(--accent-sage)] bg-[rgba(107,144,128,0.06)]"
                             : "border-[#F3F4F6] bg-white"
@@ -757,11 +757,10 @@ export default function AppointmentsPage() {
                                 key={item.id}
                                 type="button"
                                 onClick={() => setSelected(item)}
-                                className={`w-full rounded-[12px] border-l-4 px-3 py-2 text-left text-xs ${getStatusAccent(item)}`}
+                                className={`w-full overflow-hidden rounded-[12px] border-l-4 px-3 py-2 text-left text-xs ${getStatusAccent(item)}`}
                               >
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex min-w-0 items-center justify-between gap-2">
                                   <span className="font-medium">{item.time}</span>
-                                  <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
                                 </div>
                                 <p className="mt-1 truncate">{item.name}</p>
                               </button>
@@ -833,17 +832,17 @@ export default function AppointmentsPage() {
                       key={`${item.id}-sidebar`}
                       type="button"
                       onClick={() => setSelected(item)}
-                      className="w-full rounded-[14px] border border-[#E5E7EB] bg-white p-4 text-left transition-colors hover:bg-[#FAFBFC]"
+                      className="w-full overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white p-4 text-left transition-colors hover:bg-[#FAFBFC]"
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                             <p className="truncate font-medium text-slate-900">{item.name}</p>
                             <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
                           </div>
                           <p className="mt-1 text-sm text-slate-500">{item.reason || item.type}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="shrink-0 text-left sm:text-right">
                           <p className="font-medium text-slate-900">{format(toAppointmentDate(item), "h:mm a")}</p>
                           <p className="text-xs text-slate-400">{item.duration}</p>
                         </div>

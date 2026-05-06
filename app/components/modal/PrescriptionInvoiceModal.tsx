@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X, Plus, CheckCircle } from "lucide-react";
 import "./PrescriptionInvoiceModal.css";
 import { type PatientOption, type PrescriptionInvoicePayload } from "../../../lib/api";
+import SharedDatePicker from "../SharedDatePicker";
 
 type InvoiceLine = {
   id: string;
@@ -199,12 +200,12 @@ export default function PrescriptionInvoiceModal({
                   <label className="invoice-label" htmlFor="invoiceDate">
                     Invoice Date
                   </label>
-                  <input
-                    id="invoiceDate"
-                    type="date"
+                  <SharedDatePicker
+                    ariaLabel="Invoice date"
                     value={invoiceDate}
-                    onChange={(event) => setInvoiceDate(event.target.value)}
-                    className="invoice-input"
+                    onChange={setInvoiceDate}
+                    error={Boolean(errors.invoiceDate)}
+                    variant="invoice"
                   />
                   {errors.invoiceDate ? <p className="invoice-field-error">{errors.invoiceDate}</p> : null}
                 </div>

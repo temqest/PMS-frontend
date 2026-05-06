@@ -105,6 +105,7 @@ type TrendRow = {
   comparison?: number;
   forecastLow?: number;
   forecastMid?: number;
+  forecastPath?: number;
   forecastHigh?: number;
   annotation?: string;
 };
@@ -336,7 +337,7 @@ function HorizonGauge({
 }
 
 function TrendExplorerChart({ rows, overlayEnabled }: { rows: TrendRow[]; overlayEnabled: boolean }) {
-  const values = rows.flatMap((row) => [row.primary, row.comparison, row.forecastLow, row.forecastHigh]).filter((value): value is number => typeof value === "number");
+  const values = rows.flatMap((row) => [row.primary, row.comparison, row.forecastLow, row.forecastMid, row.forecastHigh, row.forecastPath]).filter((value): value is number => typeof value === "number");
   if (!rows.length || !values.length) {
     return <div className="flex h-[340px] items-center justify-center rounded-[18px] border border-dashed border-[#E5E7EB] bg-[#FAFBFC] text-sm text-slate-500">{pending("lab history and forecast data")}</div>;
   }
@@ -346,6 +347,9 @@ function TrendExplorerChart({ rows, overlayEnabled }: { rows: TrendRow[]; overla
   const spread = max - min || 1;
   const bandOne = min + spread * 0.33;
   const bandTwo = min + spread * 0.66;
+  const primaryDot = { r: 3.5, strokeWidth: 1.5, fill: "#6B9080", stroke: "#FFFFFF" };
+  const comparisonDot = { r: 3.5, strokeWidth: 1.5, fill: "#7A9CC6", stroke: "#FFFFFF" };
+  const forecastDot = { r: 3.5, strokeWidth: 1.5, fill: "#D4A373", stroke: "#FFFFFF" };
 
   return (
     <ResponsiveContainer width="100%" height={340}>
@@ -365,9 +369,29 @@ function TrendExplorerChart({ rows, overlayEnabled }: { rows: TrendRow[]; overla
         <ReferenceArea y1={bandTwo} y2={max + spread * 0.12} fill="rgba(196,91,91,0.08)" strokeOpacity={0} />
         <Area type="monotone" dataKey="forecastLow" stackId="forecast" stroke="transparent" fill="transparent" isAnimationActive={false} />
         <Area type="monotone" dataKey="forecastHigh" stackId="forecast" stroke="transparent" fill="url(#forecast-band)" isAnimationActive={false} />
-        <Line type="monotone" dataKey="primary" stroke="#6B9080" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-        {overlayEnabled ? <Line type="monotone" dataKey="comparison" stroke="#7A9CC6" strokeWidth={2.5} strokeDasharray="7 5" dot={false} /> : null}
-        <Line type="monotone" dataKey="forecastMid" stroke="#D4A373" strokeWidth={2.5} strokeDasharray="6 6" dot={{ r: 3 }} />
+        <Line type="monotone" dataKey="primary" stroke="#6B9080" strokeWidth={3} dot={primaryDot} activeDot={{ r: 5 }} connectNulls />
+        {overlayEnabled ? (
+          <Line
+            type="monotone"
+            dataKey="comparison"
+            stroke="#7A9CC6"
+            strokeWidth={2.5}
+            strokeDasharray="7 5"
+            dot={comparisonDot}
+            activeDot={{ r: 5 }}
+            connectNulls
+          />
+        ) : null}
+        <Line
+          type="monotone"
+          dataKey="forecastPath"
+          stroke="#D4A373"
+          strokeWidth={2.5}
+          strokeDasharray="6 6"
+          dot={forecastDot}
+          activeDot={{ r: 5 }}
+          connectNulls
+        />
         {rows
           .filter((row) => row.annotation)
           .map((row) =>
@@ -504,11 +528,16 @@ export default function PredictiveCarePanel({
       const trendDirection = (labForecast?.trend || primaryTrend?.trend_direction || "Stable").toLowerCase();
       const directionSign = trendDirection.includes("rise") || trendDirection.includes("worsen") ? 1 : trendDirection.includes("fall") || trendDirection.includes("improv") ? -1 : 0;
       const baseSpread = Math.max(forecastValue * 0.08, 1);
+      const lastObservedRow = [...rows].reverse().find((row) => typeof row.primary === "number");
+      if (lastObservedRow && typeof lastObservedRow.primary === "number") {
+        lastObservedRow.forecastPath = lastObservedRow.primary;
+      }
       rows.push(
         {
           label: "Forecast +7d",
           dateKey: `forecast-${rows.length + 1}`,
           forecastMid: forecastValue,
+          forecastPath: forecastValue,
           forecastLow: Math.max(0, forecastValue - baseSpread * 1.2),
           forecastHigh: forecastValue + baseSpread * 1.2,
         },
@@ -516,6 +545,7 @@ export default function PredictiveCarePanel({
           label: "Forecast +14d",
           dateKey: `forecast-${rows.length + 2}`,
           forecastMid: clamp(forecastValue + directionSign * baseSpread, 0, 9999),
+          forecastPath: clamp(forecastValue + directionSign * baseSpread, 0, 9999),
           forecastLow: Math.max(0, forecastValue + directionSign * baseSpread - baseSpread * 1.4),
           forecastHigh: forecastValue + directionSign * baseSpread + baseSpread * 1.4,
         }

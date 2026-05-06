@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
-  Calendar,
   CheckCircle,
   ChevronDown,
   FileText,
@@ -20,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import "./RecordModal.css";
+import SharedDatePicker from "../SharedDatePicker";
 
 export type RecordType = "Visit" | "Lab Result" | "Imaging" | "Prescription" | "Vaccination" | "Note";
 type LabStatus = "Normal" | "Abnormal" | "Critical";
@@ -661,22 +661,19 @@ export default function RecordModal({
                 <div className="record-field-grid record-field-grid-2">
                   <div className="record-field">
                     <label className="record-label">Date</label>
-                    <div className="record-input-with-icon-right">
-                      <input
-                        type="date"
-                        className={`record-input ${showFieldError("date") ? "record-input-error" : ""}`}
-                        value={form.date}
-                        onChange={(event) => {
-                          setForm((previous) => ({ ...previous, date: event.target.value }));
-                          setErrors((previous) => ({ ...previous, date: "" }));
-                          markDirty();
-                        }}
-                        onBlur={() => {
-                          if (!form.date) setErrors((previous) => ({ ...previous, date: "Date is required" }));
-                        }}
-                      />
-                      <Calendar size={16} strokeWidth={1.5} className="record-input-icon-right" />
-                    </div>
+                    <SharedDatePicker
+                      ariaLabel="Record date"
+                      value={form.date}
+                      onChange={(date) => {
+                        setForm((previous) => ({ ...previous, date }));
+                        setErrors((previous) => ({ ...previous, date: "" }));
+                        markDirty();
+                      }}
+                      onBlur={() => {
+                        if (!form.date) setErrors((previous) => ({ ...previous, date: "Date is required" }));
+                      }}
+                      error={showFieldError("date")}
+                    />
                     {showFieldError("date") ? (
                       <div className="record-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />
@@ -806,12 +803,11 @@ export default function RecordModal({
                         </div>
                         <div className="record-field">
                           <label className="record-label">Follow-up due (optional)</label>
-                          <input
-                            className="record-input"
-                            type="date"
+                          <SharedDatePicker
+                            ariaLabel="Follow-up due date"
                             value={form.followUpDueDate}
-                            onChange={(event) => {
-                              setForm((previous) => ({ ...previous, followUpDueDate: event.target.value }));
+                            onChange={(followUpDueDate) => {
+                              setForm((previous) => ({ ...previous, followUpDueDate }));
                               markDirty();
                             }}
                           />
@@ -1349,11 +1345,25 @@ export default function RecordModal({
                       <div className="record-field-grid record-field-grid-2">
                         <div className="record-field">
                           <label className="record-label">Start Date</label>
-                          <input className="record-input" type="date" value={form.prescriptionStartDate} onChange={(event) => { setForm((previous) => ({ ...previous, prescriptionStartDate: event.target.value })); markDirty(); }} />
+                          <SharedDatePicker
+                            ariaLabel="Prescription start date"
+                            value={form.prescriptionStartDate}
+                            onChange={(prescriptionStartDate) => {
+                              setForm((previous) => ({ ...previous, prescriptionStartDate }));
+                              markDirty();
+                            }}
+                          />
                         </div>
                         <div className="record-field">
                           <label className="record-label">End Date</label>
-                          <input className="record-input" type="date" value={form.prescriptionEndDate} onChange={(event) => { setForm((previous) => ({ ...previous, prescriptionEndDate: event.target.value })); markDirty(); }} />
+                          <SharedDatePicker
+                            ariaLabel="Prescription end date"
+                            value={form.prescriptionEndDate}
+                            onChange={(prescriptionEndDate) => {
+                              setForm((previous) => ({ ...previous, prescriptionEndDate }));
+                              markDirty();
+                            }}
+                          />
                         </div>
                       </div>
 
@@ -1413,15 +1423,15 @@ export default function RecordModal({
                         </div>
                         <div className="record-field">
                           <label className="record-label">Expiration Date</label>
-                          <input
-                            className={`record-input ${showFieldError("vaccinationExpirationDate") ? "record-input-error" : ""}`}
-                            type="date"
+                          <SharedDatePicker
+                            ariaLabel="Vaccination expiration date"
                             value={form.vaccinationExpirationDate}
-                            onChange={(event) => {
-                              setForm((previous) => ({ ...previous, vaccinationExpirationDate: event.target.value }));
+                            onChange={(vaccinationExpirationDate) => {
+                              setForm((previous) => ({ ...previous, vaccinationExpirationDate }));
                               setErrors((previous) => ({ ...previous, vaccinationExpirationDate: "" }));
                               markDirty();
                             }}
+                            error={showFieldError("vaccinationExpirationDate")}
                           />
                           {showFieldError("vaccinationExpirationDate") ? (
                             <div className="record-error-message">
@@ -1476,7 +1486,14 @@ export default function RecordModal({
                       <div className="record-field-grid record-field-grid-2">
                         <div className="record-field">
                           <label className="record-label">Next Dose Due</label>
-                          <input className="record-input" type="date" value={form.vaccinationNextDoseDue} onChange={(event) => { setForm((previous) => ({ ...previous, vaccinationNextDoseDue: event.target.value })); markDirty(); }} />
+                          <SharedDatePicker
+                            ariaLabel="Vaccination next dose due date"
+                            value={form.vaccinationNextDoseDue}
+                            onChange={(vaccinationNextDoseDue) => {
+                              setForm((previous) => ({ ...previous, vaccinationNextDoseDue }));
+                              markDirty();
+                            }}
+                          />
                         </div>
                         <div className="record-field">
                           <label className="record-checkbox-row record-checkbox-toggle-row">

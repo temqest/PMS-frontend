@@ -71,6 +71,9 @@ const baseNavigation = [
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/records", label: "Health Records", icon: FolderOpen },
   { href: "/analytics", label: "Analytics", icon: ChartLine },
+];
+
+const utilityNavigation = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -211,7 +214,8 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
     router.push("/");
   }, [router]);
 
-  const navigation = isStaff ? [...baseNavigation, adminNavItem] : baseNavigation;
+  const navigation = baseNavigation;
+  const sidebarUtilities = isStaff ? [...utilityNavigation, adminNavItem] : utilityNavigation;
 
   return (
     <WorkspaceContext.Provider value={contextValue}>
@@ -269,6 +273,29 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+
+            <div className="mt-6 border-t border-[#E5E7EB] pt-4">
+              {sidebarUtilities.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    className={`group flex h-10 items-center gap-3 rounded-[8px] px-3 text-sm font-medium transition-all duration-150 ${
+                      active
+                        ? "border-l-[3px] border-l-[var(--accent-sage)] bg-[rgba(107,144,128,0.08)] text-[var(--accent-sage)]"
+                        : "border-l-[3px] border-l-transparent text-slate-600 hover:bg-[#F3F4F6] hover:text-slate-900"
+                    } ${collapsed ? "justify-center px-2" : ""}`}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+                    {!collapsed ? <span>{item.label}</span> : null}
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
 
           <div className="border-t border-[#E5E7EB] p-3">
