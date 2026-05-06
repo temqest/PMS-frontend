@@ -12,9 +12,12 @@ import PrescriptionModal from "../../../components/modal/PrescriptionModal";
 import PredictiveCarePanel from "../../../components/predictive-care/patient-predictive-care-panel";
 import api from "../../../../lib/api";
 import type {
+  PredictiveCareAdherenceRow,
   PredictiveCareLabForecast,
   PredictiveCareLabTrend,
   PredictiveCareProfile,
+  PredictiveCareRadarPayload,
+  PredictiveCareTimelineEvent,
   UiAppointment,
   UiHealthRecord,
   UiPrescription,
@@ -72,6 +75,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [predictiveRefreshing, setPredictiveRefreshing] = useState(false);
   const [predictiveError, setPredictiveError] = useState<string | null>(null);
   const [predictiveFetchedAt, setPredictiveFetchedAt] = useState<string | null>(null);
+  const [predictiveDisclaimer, setPredictiveDisclaimer] = useState<string | null>(null);
+  const [predictiveAdherence, setPredictiveAdherence] = useState<PredictiveCareAdherenceRow[]>([]);
+  const [predictiveRadar, setPredictiveRadar] = useState<PredictiveCareRadarPayload | null>(null);
+  const [predictiveTimeline, setPredictiveTimeline] = useState<PredictiveCareTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [nowTs] = useState(() => Date.now());
   const resolvedParams = use(params);
@@ -100,42 +107,60 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       try {
         let profileResp = null;
         let trendResp = null;
+        let computeError: Error | null = null;
 
         if (forceCompute) {
-          await api.computePredictiveCareProfile(patientId).catch(() => {
-            // Silently handle compute errors
+          profileResp = await api.computePredictiveCareProfile(patientId).catch((err) => {
+            computeError = err instanceof Error ? err : new Error("Unable to recompute predictive profile.");
+            return null;
           });
         }
 
         // Try to fetch profile; if 404, attempt auto-compute
         try {
-          profileResp = await api.getPredictiveCareProfile(patientId);
+          profileResp = profileResp || await api.getPredictiveCareProfile(patientId);
         } catch (err) {
           const apiErr = err as { status?: number; message?: string };
           if (apiErr.status === 404) {
             // Profile doesn't exist yet, auto-compute on first load
             if (!forceCompute) {
-              await api.computePredictiveCareProfile(patientId).catch(() => {
-                // Silently handle auto-compute errors
+              profileResp = await api.computePredictiveCareProfile(patientId).catch((computeErr) => {
+                computeError =
+                  computeErr instanceof Error
+                    ? computeErr
+                    : new Error("Unable to compute predictive profile.");
+                return null;
               });
               // Retry fetch after compute
-              profileResp = await api.getPredictiveCareProfile(patientId).catch(() => null);
+              profileResp = profileResp || await api.getPredictiveCareProfile(patientId).catch(() => null);
             }
           }
-          // Silently handle other fetch errors
+          if (!profileResp && apiErr.status && apiErr.status !== 404) {
+            throw err;
+          }
         }
 
-        // Fetch trends independently; errors don't block the profile
-        trendResp = await api.getPredictiveCareLabTrends(patientId).catch(() => {
-          // Silently handle lab trends fetch errors
-          return null;
-        });
+        const [trendRespParallel, adherResp, radarResp, timelineResp] = await Promise.all([
+          api.getPredictiveCareLabTrends(patientId).catch(() => null),
+          api.getPredictiveCareAdherence(patientId).catch(() => null),
+          api.getPredictiveCareRiskRadar(patientId).catch(() => null),
+          api.getPredictiveCareAlertTimeline(patientId).catch(() => null),
+        ]);
+        trendResp = trendRespParallel;
 
         const profile = profileResp?.profile || null;
         const trends = Array.isArray(trendResp?.trends) ? trendResp.trends : [];
 
+        if (!profile && computeError) {
+          throw computeError;
+        }
+
         setPredictiveProfile(profile);
         setLabTrends(trends);
+        setPredictiveDisclaimer(profileResp?.predictive_care_disclaimer ?? null);
+        setPredictiveAdherence(Array.isArray(adherResp?.adherence) ? adherResp.adherence : []);
+        setPredictiveRadar(radarResp && typeof radarResp === "object" ? radarResp : null);
+        setPredictiveTimeline(Array.isArray(timelineResp?.timeline) ? timelineResp.timeline : []);
 
         const primaryTrend = [...trends]
           .sort((a, b) => (b.chart_data?.length || 0) - (a.chart_data?.length || 0))
@@ -165,6 +190,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         setPredictiveProfile(null);
         setLabTrends([]);
         setLabForecast(null);
+        setPredictiveDisclaimer(null);
+        setPredictiveAdherence([]);
+        setPredictiveRadar(null);
+        setPredictiveTimeline([]);
       } finally {
         setPredictiveLoading(false);
         setPredictiveRefreshing(false);
@@ -414,6 +443,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 profile={predictiveProfile}
                 labTrends={labTrends}
                 labForecast={labForecast}
+                adherence={predictiveAdherence}
+                riskRadar={predictiveRadar}
+                alertTimeline={predictiveTimeline}
+                disclaimer={predictiveDisclaimer}
                 loading={predictiveLoading}
                 recomputing={predictiveRefreshing}
                 fetchedAt={predictiveFetchedAt}

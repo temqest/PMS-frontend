@@ -1,7 +1,7 @@
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  (typeof window !== "undefined" ? window.location.origin : "")
+  ""
 ).replace(/\/$/, "");
 
 const DEBUG_API_ERRORS = process.env.NEXT_PUBLIC_DEBUG_API === "true";
@@ -476,6 +476,12 @@ export type PredictiveCareRiskFactor = {
   importance?: number;
 };
 
+export type PredictiveCareMlExplanationRow = {
+  feature?: string;
+  importance?: number;
+  resolved_value?: unknown;
+};
+
 export type PredictiveCareProfile = {
   patient_id?: string;
   patient_name?: string;
@@ -494,6 +500,35 @@ export type PredictiveCareProfile = {
   ml_anomaly_score?: number;
   ml_computed_at?: string;
   ml_service_used?: boolean;
+  ml_feature_version?: string;
+  ml_label_definition?: string;
+  ml_last_feature_snapshot?: Record<string, unknown>;
+  ml_explanation?: PredictiveCareMlExplanationRow[];
+};
+
+export type PredictiveCareAdherenceRow = {
+  medicine?: string;
+  score?: number;
+  status?: string;
+  longest_gap_days?: number;
+};
+
+export type PredictiveCareRadarAxis = { axis?: string; value?: number };
+
+export type PredictiveCareRadarPayload = {
+  patient_id?: string;
+  patient_name?: string;
+  radar?: PredictiveCareRadarAxis[];
+  overall_score?: number;
+  overall_risk_level?: string;
+};
+
+export type PredictiveCareTimelineEvent = {
+  date?: string;
+  type?: string;
+  severity?: string;
+  title?: string;
+  is_resolved?: boolean;
 };
 
 export type PredictiveCareLabTrendPoint = {
@@ -551,12 +586,17 @@ export type PredictiveAlertsQueryParams = Record<string, string | number | boole
 export const getPredictiveCareProfile = (patientId: string) =>
   request(`/api/v1/predictive-care/profiles/${encodeURIComponent(patientId)}`) as Promise<{
     profile?: PredictiveCareProfile;
+    predictive_care_disclaimer?: string;
   }>;
 
 export const computePredictiveCareProfile = (patientId: string) =>
   request(`/api/v1/predictive-care/profiles/${encodeURIComponent(patientId)}/compute`, {
     method: 'POST',
-  }) as Promise<{ message?: string; profile?: PredictiveCareProfile }>;
+  }) as Promise<{
+    message?: string;
+    profile?: PredictiveCareProfile;
+    predictive_care_disclaimer?: string;
+  }>;
 
 export const getPredictiveCareLabTrends = (patientId: string) =>
   request(`/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/lab-trends`) as Promise<{
@@ -574,6 +614,22 @@ export const getPredictiveCareLabForecast = (
       last_values: lastValues.length > 0 ? lastValues.join(',') : undefined,
     })}`
   ) as Promise<PredictiveCareLabForecast>;
+
+export const getPredictiveCareAdherence = (patientId: string) =>
+  request(`/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/adherence`) as Promise<{
+    adherence?: PredictiveCareAdherenceRow[];
+  }>;
+
+export const getPredictiveCareRiskRadar = (patientId: string) =>
+  request(`/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/risk-radar`) as Promise<
+    PredictiveCareRadarPayload
+  >;
+
+export const getPredictiveCareAlertTimeline = (patientId: string) =>
+  request(`/api/v1/predictive-care/analytics/${encodeURIComponent(patientId)}/alert-timeline`) as Promise<{
+    timeline?: PredictiveCareTimelineEvent[];
+  }>;
+
 /** GET /predictive-care/alerts — returns `{ alerts }` plus pagination meta is not unwrapped by `request` meta; use alerts list from result */
 export const getPredictiveAlerts = (params?: PredictiveAlertsQueryParams) =>
   request(`/api/v1/predictive-care/alerts${makeQuery(params)}`) as Promise<{ alerts?: CareAlertItem[] }>;
@@ -608,6 +664,9 @@ const api = {
   computePredictiveCareProfile,
   getPredictiveCareLabTrends,
   getPredictiveCareLabForecast,
+  getPredictiveCareAdherence,
+  getPredictiveCareRiskRadar,
+  getPredictiveCareAlertTimeline,
   getPendingUsers,
   getAllUsers,
   activateUser,

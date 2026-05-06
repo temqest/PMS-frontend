@@ -35,12 +35,23 @@ import {
 } from "recharts";
 
 import { Badge, SectionHeader, WorkspaceCard } from "../workspace-ui";
-import type { PredictiveCareLabForecast, PredictiveCareLabTrend, PredictiveCareProfile } from "../../../lib/api";
+import type {
+  PredictiveCareAdherenceRow,
+  PredictiveCareLabForecast,
+  PredictiveCareLabTrend,
+  PredictiveCareProfile,
+  PredictiveCareRadarPayload,
+  PredictiveCareTimelineEvent,
+} from "../../../lib/api";
 
 type PredictiveCarePanelProps = {
   profile: PredictiveCareProfile | null;
   labTrends: PredictiveCareLabTrend[];
   labForecast: PredictiveCareLabForecast | null;
+  adherence?: PredictiveCareAdherenceRow[];
+  riskRadar?: PredictiveCareRadarPayload | null;
+  alertTimeline?: PredictiveCareTimelineEvent[];
+  disclaimer?: string | null;
   loading: boolean;
   onRefresh: () => void;
   onRecompute: () => void;
@@ -138,6 +149,16 @@ const featureSeverity = (weight: number): "high" | "medium" | "low" => {
   if (weight >= 0.7) return "high";
   if (weight >= 0.4) return "medium";
   return "low";
+};
+
+const formatResolvedFromSnapshot = (featureRaw: string, resolved: unknown) => {
+  if (typeof resolved === "number" && Number.isFinite(resolved)) {
+    return `${resolved} (latest feature snapshot)`;
+  }
+  if (resolved != null && resolved !== "") {
+    return `${String(resolved)} (latest feature snapshot)`;
+  }
+  return null;
 };
 
 const featureCurrentValue = (feature: string, primaryTrend?: PredictiveCareLabTrend | null) => {
@@ -265,7 +286,17 @@ function RiskGaugeBar({ score }: { score: number }) {
   );
 }
 
-function HorizonGauge({ score, level }: { score: number; level: string }) {
+function HorizonGauge({
+  score,
+  level,
+  title = "Utilization / follow-up risk",
+  description = "Higher values suggest a closer follow-up window. When hospitalization data is unavailable, this reflects a documented visit-based proxy.",
+}: {
+  score: number;
+  level: string;
+  title?: string;
+  description?: string;
+}) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (clamp(score, 0, 100) / 100) * circumference;
@@ -295,8 +326,8 @@ function HorizonGauge({ score, level }: { score: number; level: string }) {
         </text>
       </svg>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-slate-700">Readmission risk</p>
-        <p className="text-sm text-slate-500">Higher values suggest a closer follow-up window and tighter discharge planning.</p>
+        <p className="text-sm font-medium text-slate-700">{title}</p>
+        <p className="text-sm text-slate-500">{description}</p>
       </div>
     </div>
   );
@@ -373,6 +404,10 @@ export default function PredictiveCarePanel({
   profile,
   labTrends,
   labForecast,
+  adherence = [],
+  riskRadar = null,
+  alertTimeline = [],
+  disclaimer,
   loading,
   onRefresh,
   onRecompute,
@@ -385,24 +420,6 @@ export default function PredictiveCarePanel({
   const [primaryTrendName, setPrimaryTrendName] = useState<string | null>(null);
   const [comparisonTrendName, setComparisonTrendName] = useState<string | null>(null);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
-
-  const topFactors = useMemo<FeatureRow[]>(() => {
-    const raw = (profile?.ml_top_risk_factors || [])
-      .filter((item) => typeof item.importance === "number" && typeof item.feature === "string")
-      .sort((a, b) => (Number(b.importance) || 0) - (Number(a.importance) || 0))
-      .slice(0, 7);
-
-    return raw.map((item) => {
-      const weight = clamp(Number(item.importance) || 0, 0, 1);
-      const feature = readableFeature(String(item.feature || "Feature"));
-      return {
-        feature,
-        importance: weight,
-        currentValue: featureCurrentValue(feature, null),
-        severity: featureSeverity(weight),
-      };
-    });
-  }, [profile]);
 
   const trendOptions = useMemo(
     () =>
@@ -429,6 +446,32 @@ export default function PredictiveCarePanel({
     }
     return options[0] || null;
   }, [comparisonTrendName, primaryTrend?.test_name, trendOptions]);
+
+  const topFactors = useMemo<FeatureRow[]>(() => {
+    const raw = (profile?.ml_top_risk_factors || [])
+      .filter((item) => typeof item.importance === "number" && typeof item.feature === "string")
+      .sort((a, b) => (Number(b.importance) || 0) - (Number(a.importance) || 0))
+      .slice(0, 7);
+
+    const expMap = new Map(
+      (profile?.ml_explanation || []).map((row) => [String(row.feature || ""), row.resolved_value])
+    );
+
+    return raw.map((item) => {
+      const weight = clamp(Number(item.importance) || 0, 0, 1);
+      const rawKey = String(item.feature || "");
+      const feature = readableFeature(rawKey);
+      const resolved = expMap.get(rawKey);
+      const fromSnapshot = formatResolvedFromSnapshot(rawKey, resolved);
+      const currentValue = fromSnapshot || featureCurrentValue(feature, primaryTrend);
+      return {
+        feature,
+        importance: weight,
+        currentValue,
+        severity: featureSeverity(weight),
+      };
+    });
+  }, [profile, primaryTrend]);
 
   const trendSeries = (() => {
     const map = new Map<string, TrendRow>();
@@ -504,12 +547,25 @@ export default function PredictiveCarePanel({
 
   const riskBreakdown = [
     { name: "Chronic", value: clamp(profile?.chronic_disease_risk ?? 0, 0, 100), color: "#6B9080" },
-    { name: "Readmission", value: clamp(readmissionScore, 0, 100), color: "#7A9CC6" },
+    { name: "Utilization", value: clamp(readmissionScore, 0, 100), color: "#7A9CC6" },
     { name: "No-show", value: clamp(profile?.no_show_risk ?? 0, 0, 100), color: "#D4A373" },
     { name: "Adherence", value: clamp(profile?.adherence_risk ?? 0, 0, 100), color: "#C45B5B" },
   ];
   const dominantRisk = [...riskBreakdown].sort((a, b) => b.value - a.value)[0];
-  const radarReference = riskBreakdown.map((item) => ({ name: item.name, value: Math.min(100, Math.round(item.value * 0.62 + 18)), fullMark: 100 }));
+  const radarAxisMap: Record<string, string> = {
+    Chronic: "Chronic Disease",
+    Utilization: "Readmission",
+    "No-show": "No-show",
+    Adherence: "Adherence",
+  };
+  const radarReference = riskBreakdown.map((item) => {
+    const axis = radarAxisMap[item.name] ?? item.name;
+    const match = riskRadar?.radar?.find((r) => r.axis === axis);
+    if (typeof match?.value === "number" && Number.isFinite(match.value)) {
+      return { name: item.name, value: match.value, fullMark: 100 };
+    }
+    return { name: item.name, value: Math.min(100, Math.round(item.value * 0.62 + 18)), fullMark: 100 };
+  });
 
   const recommendations: Recommendation[] = (() => {
     const items: Recommendation[] = [];
@@ -517,8 +573,8 @@ export default function PredictiveCarePanel({
 
     if (readmissionScore >= 60 || topFeatureText.includes("readmission") || topFeatureText.includes("hospital")) {
       items.push({
-        trigger: `${readmissionHorizon}-day readmission risk is elevated`,
-        action: "Schedule a follow-up visit within 7-14 days and review the discharge plan",
+        trigger: `${readmissionHorizon}-day utilization / follow-up risk is elevated (visit proxy)`,
+        action: "Schedule a follow-up visit within 7-14 days and review the care plan",
         urgency: "Urgent",
         impact: Math.round(readmissionScore * 0.12),
       });
@@ -580,8 +636,35 @@ export default function PredictiveCarePanel({
       tone: "blue",
     };
 
+    const alertEvents: TimelineEvent[] = (alertTimeline || []).slice(0, 4).map((ev) => ({
+      label: ev.title || String(ev.type || "Alert"),
+      source: String(ev.type || "Care alert"),
+      dateText: formatDate(ev.date),
+      tone:
+        ev.severity === "Critical" ? ("red" as const) : ev.severity === "Warning" ? ("amber" as const) : ("sage" as const),
+    }));
+
+    const adherenceSummary: TimelineEvent =
+      adherence.length > 0
+        ? {
+            label: `${adherence.length} medication(s) with adherence data`,
+            source: "Adherence engine",
+            dateText: `Avg score ${Math.round(
+              adherence.reduce((s, r) => s + (typeof r.score === "number" ? r.score : 100), 0) / adherence.length
+            )}`,
+            tone: "blue",
+          }
+        : {
+            label: pending("adherence records"),
+            source: "Adherence",
+            dateText: pending("adherence records"),
+            tone: "blue",
+          };
+
     const events: TimelineEvent[] = [
       ...(recentLabs.length ? recentLabs : [pendingLabEvent]),
+      ...alertEvents,
+      adherenceSummary,
       {
         label: "Predictive profile computed",
         source: "ML profile",
@@ -594,28 +677,18 @@ export default function PredictiveCarePanel({
         dateText: anomalySeries,
         tone: profile?.ml_is_anomaly ? "red" : "sage",
       },
-      {
-        label: pending("hospital encounter history"),
-        source: "Encounters",
-        dateText: pending("encounter history"),
-        tone: "amber",
-      },
-      {
-        label: pending("medication change history"),
-        source: "Prescription records",
-        dateText: pending("medication records"),
-        tone: "amber",
-      },
-      {
-        label: pending("no-show appointment history"),
-        source: "Appointments",
-        dateText: pending("appointment history"),
-        tone: "amber",
-      },
     ];
 
     return events.slice(0, 6);
-  }, [anomalySeries, extendedProfile?.ml_computed_at, primaryTrend?.chart_data, primaryTrend?.test_name, profile?.ml_is_anomaly]);
+  }, [
+    adherence,
+    alertTimeline,
+    anomalySeries,
+    extendedProfile?.ml_computed_at,
+    primaryTrend?.chart_data,
+    primaryTrend?.test_name,
+    profile?.ml_is_anomaly,
+  ]);
 
   const isInitialLoading = loading && !profile;
   const hasError = Boolean(error && !profile);
@@ -629,7 +702,7 @@ export default function PredictiveCarePanel({
             subtitle={profile?.patient_name ? `Clinically oriented ML signals for ${profile.patient_name}` : "Patient-level ML signals, forecast points, and action cues"}
             action={
               <div className="flex flex-wrap items-center gap-2">
-                <InfoBadge text="What affects this score? The overall risk blends chronic disease, readmission, no-show, and adherence signals." />
+                <InfoBadge text="What affects this score? The overall risk blends chronic burden, utilization (visit-based proxy), no-show, and adherence." />
                 {fetchedAt ? <span className="text-xs text-slate-500">Data refreshed {new Date(fetchedAt).toLocaleString()}</span> : <span className="text-xs text-slate-500">{pending("dashboard refresh")}</span>}
                 <button
                   type="button"
@@ -655,6 +728,11 @@ export default function PredictiveCarePanel({
           <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
             This view explains the score in plain language, ties it back to the patient&apos;s lab and behavior signals, and highlights the next best action.
           </p>
+          {disclaimer ? (
+            <p className="mt-3 max-w-4xl rounded-[12px] border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs leading-5 text-amber-950">
+              {disclaimer}
+            </p>
+          ) : null}
         </div>
 
         {isInitialLoading ? (
@@ -716,7 +794,7 @@ export default function PredictiveCarePanel({
                       <span className="text-slate-500">{pending("last week&apos;s profile snapshot")}</span>
                     )}
                   </span>
-                  <span className="text-slate-500">What affects this score? chronic disease risk, readmission likelihood, no-show patterns, and adherence.</span>
+                  <span className="text-slate-500">What affects this score? chronic disease burden, short-horizon utilization (visit-based proxy), no-show patterns, and adherence.</span>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{riskFactorsSentence}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -734,10 +812,10 @@ export default function PredictiveCarePanel({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-slate-600">Readmission probability</p>
-                      <InfoBadge text="Select 30-day or 90-day horizon. The benchmark line is shown when cohort data is available; otherwise it is marked as pending." />
+                      <p className="text-sm font-medium text-slate-600">Utilization / follow-up probability</p>
+                      <InfoBadge text="Visit-based 90-day proxy (no hospital feed). Select 30-day or 90-day horizon for display scaling." />
                     </div>
-                    <p className="text-sm text-slate-500">Short-horizon risk for proactive follow-up planning.</p>
+                    <p className="text-sm text-slate-500">Short-horizon signal for proactive follow-up planning.</p>
                   </div>
                   <div className="flex overflow-hidden rounded-full border border-[#E5E7EB] bg-white p-1 text-xs">
                     <button type="button" onClick={() => setReadmissionHorizon(30)} className={`rounded-full px-3 py-1.5 ${readmissionHorizon === 30 ? "bg-[var(--accent-sage)] text-white" : "text-slate-500"}`}>
@@ -749,7 +827,15 @@ export default function PredictiveCarePanel({
                   </div>
                 </div>
                 <div className="mt-4">
-                  <HorizonGauge score={readmissionScore} level={riskLevelFromScore(readmissionScore)} />
+                  <HorizonGauge
+                    score={readmissionScore}
+                    level={riskLevelFromScore(readmissionScore)}
+                    title="Utilization / follow-up risk (visit proxy)"
+                    description={
+                      profile?.ml_label_definition ||
+                      "Higher values suggest a closer follow-up window. This is not a hospital readmission prediction unless linked encounter data exists."
+                    }
+                  />
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[14px] border border-[#E5E7EB] bg-[#FAFBFC] p-3">
@@ -950,7 +1036,7 @@ export default function PredictiveCarePanel({
           <WorkspaceCard className="p-6">
             <SectionHeader
               title="Risk composition donut"
-              subtitle="Shows how the overall score is distributed across chronic, readmission, no-show, and adherence drivers"
+              subtitle="Shows how the overall score is distributed across chronic burden, utilization (visit proxy), no-show, and adherence"
               action={<InfoBadge text="What affects this score? Hover to see the point contribution for each risk category." />}
             />
             <div className="relative mt-4 h-[280px]">

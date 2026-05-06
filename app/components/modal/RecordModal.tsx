@@ -48,6 +48,9 @@ export type RecordForm = {
   provider: string;
   visitReason: string;
   visitType: "Follow-up" | "Annual Physical" | "Urgent" | "Consultation" | "Procedure";
+  chiefComplaint: string;
+  visitDisposition: "" | "Routine" | "Urgent" | "Referred" | "Observation" | "Other";
+  followUpDueDate: string;
   visitBpSystolic: string;
   visitBpDiastolic: string;
   visitHeartRate: string;
@@ -154,6 +157,9 @@ function createInitialForm(
     provider: initialData?.provider ?? defaultProvider,
     visitReason: initialData?.visitReason ?? "",
     visitType: initialData?.visitType ?? "Follow-up",
+    chiefComplaint: initialData?.chiefComplaint ?? "",
+    visitDisposition: initialData?.visitDisposition ?? "",
+    followUpDueDate: initialData?.followUpDueDate ?? "",
     visitBpSystolic: initialData?.visitBpSystolic ?? "",
     visitBpDiastolic: initialData?.visitBpDiastolic ?? "",
     visitHeartRate: initialData?.visitHeartRate ?? "",
@@ -756,6 +762,59 @@ export default function RecordModal({
                             <option value="Procedure">Procedure</option>
                           </select>
                           <ChevronDown size={12} strokeWidth={1.5} className="record-select-caret" />
+                        </div>
+                      </div>
+
+                      <div className="record-field">
+                        <label className="record-label">Chief complaint (optional)</label>
+                        <input
+                          className="record-input"
+                          maxLength={500}
+                          placeholder="Short chief complaint for predictive care"
+                          value={form.chiefComplaint}
+                          onChange={(event) => {
+                            setForm((previous) => ({ ...previous, chiefComplaint: event.target.value }));
+                            markDirty();
+                          }}
+                        />
+                      </div>
+
+                      <div className="record-field-grid record-field-grid-2">
+                        <div className="record-field">
+                          <label className="record-label">Disposition (optional)</label>
+                          <div className="record-select-with-icon">
+                            <select
+                              className="record-select"
+                              value={form.visitDisposition}
+                              onChange={(event) => {
+                                setForm((previous) => ({
+                                  ...previous,
+                                  visitDisposition: event.target.value as RecordForm["visitDisposition"],
+                                }));
+                                markDirty();
+                              }}
+                            >
+                              <option value="">—</option>
+                              <option value="Routine">Routine</option>
+                              <option value="Urgent">Urgent</option>
+                              <option value="Referred">Referred</option>
+                              <option value="Observation">Observation</option>
+                              <option value="Other">Other</option>
+                            </select>
+                            <ChevronDown size={12} strokeWidth={1.5} className="record-select-caret" />
+                          </div>
+                        </div>
+                        <div className="record-field">
+                          <label className="record-label">Follow-up due (optional)</label>
+                          <input
+                            className="record-input"
+                            type="date"
+                            value={form.followUpDueDate}
+                            onChange={(event) => {
+                              setForm((previous) => ({ ...previous, followUpDueDate: event.target.value }));
+                              markDirty();
+                            }}
+                          />
                         </div>
                       </div>
 
