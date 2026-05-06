@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, MoreVertical, Pencil, Plus } from "lucide-react";
 
@@ -40,6 +41,12 @@ type PatientProfile = {
   blood_type?: string;
   allergies?: string[];
   medications?: string[] | string;
+  lifestyle?: {
+    smoking?: boolean;
+    alcohol?: boolean;
+    diet?: string;
+    physical_activity?: string;
+  };
   status?: string;
 };
 
@@ -63,7 +70,8 @@ const recordTitle = (record: RecordForm) => {
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { pushToast, requestConfirm } = useWorkspace();
-  const [tab, setTab] = useState("Overview");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(() => (searchParams.get("tab") === "predictive" ? "Predictive Care" : "Overview"));
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
@@ -249,7 +257,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   // Auto-refresh predictive care whenever user enters the tab.
   useEffect(() => {
     if (tab !== "Predictive Care") return;
-    void loadPredictiveCare(false);
+    const timer = setTimeout(() => {
+      void loadPredictiveCare(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [tab, loadPredictiveCare]);
 
   const display = patient;
@@ -324,6 +335,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 <QuickLine label="Address" value={display.address || "-"} />
                 <QuickLine label="Emergency Contact" value={display.emergency_contact_name || display.emergency_contact_phone || "-"} />
                 <QuickLine label="Age / Gender" value={`${display.age || "-"} / ${display.gender || "-"}`} />
+                <QuickLine label="Smoking" value={display.lifestyle?.smoking ? "Yes" : "No"} />
+                <QuickLine label="Alcohol" value={display.lifestyle?.alcohol ? "Yes" : "No"} />
+                <QuickLine label="Diet" value={display.lifestyle?.diet || "-"} />
+                <QuickLine label="Physical Activity" value={display.lifestyle?.physical_activity || "-"} />
               </div>
             </WorkspaceCard>
 
@@ -494,6 +509,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 <div key={record.id} className="rounded-[12px] border border-[#F3F4F6] p-4">
                   <div className="flex items-center gap-2">
                     <Badge tone="blue">{record.recordType}</Badge>
+                    <Badge tone="neutral">{record.conditionCategory}</Badge>
                     <span className="text-xs text-slate-400">{record.date || "-"}</span>
                   </div>
                   <p className="mt-2 font-medium text-slate-900">{record.title}</p>

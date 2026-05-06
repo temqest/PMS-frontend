@@ -38,6 +38,10 @@ type PatientData = {
   insuranceProvider?: string;
   policyNumber?: string;
   groupNumber?: string;
+  lifestyleSmoking?: boolean;
+  lifestyleAlcohol?: boolean;
+  lifestyleDiet?: string;
+  lifestylePhysicalActivity?: string;
   notes?: string;
   isActive?: boolean;
 };
@@ -78,6 +82,10 @@ export default function PatientModal({
     insuranceProvider: initialData?.insuranceProvider || "",
     policyNumber: initialData?.policyNumber || "",
     groupNumber: initialData?.groupNumber || "",
+    lifestyleSmoking: initialData?.lifestyleSmoking || false,
+    lifestyleAlcohol: initialData?.lifestyleAlcohol || false,
+    lifestyleDiet: initialData?.lifestyleDiet || "",
+    lifestylePhysicalActivity: initialData?.lifestylePhysicalActivity || "",
     notes: initialData?.notes || "",
     isActive: initialData?.isActive !== false,
   });
@@ -113,6 +121,10 @@ export default function PatientModal({
       form.insuranceProvider !== (initialData?.insuranceProvider || "") ||
       form.policyNumber !== (initialData?.policyNumber || "") ||
       form.groupNumber !== (initialData?.groupNumber || "") ||
+      form.lifestyleSmoking !== (initialData?.lifestyleSmoking || false) ||
+      form.lifestyleAlcohol !== (initialData?.lifestyleAlcohol || false) ||
+      form.lifestyleDiet !== (initialData?.lifestyleDiet || "") ||
+      form.lifestylePhysicalActivity !== (initialData?.lifestylePhysicalActivity || "") ||
       form.notes !== (initialData?.notes || "") ||
       (mode === "edit" && form.isActive !== (initialData?.isActive !== false));
     setIsDirty(hasChanges);
@@ -168,6 +180,10 @@ export default function PatientModal({
       insuranceProvider: initialData?.insuranceProvider || "",
       policyNumber: initialData?.policyNumber || "",
       groupNumber: initialData?.groupNumber || "",
+      lifestyleSmoking: initialData?.lifestyleSmoking || false,
+      lifestyleAlcohol: initialData?.lifestyleAlcohol || false,
+      lifestyleDiet: initialData?.lifestyleDiet || "",
+      lifestylePhysicalActivity: initialData?.lifestylePhysicalActivity || "",
       notes: initialData?.notes || "",
       isActive: initialData?.isActive !== false,
     });
@@ -566,7 +582,79 @@ export default function PatientModal({
                   )}
                 </div>
 
-                {/* Additional information section removed per request */}
+                <div className="patient-section-header patient-section-header-secondary">
+                  <h2 className="patient-section-title">Lifestyle Information</h2>
+                </div>
+
+                <div className="patient-field-row patient-field-row-2">
+                  <div className="patient-field">
+                    <label className="patient-label">Smoking</label>
+                    <select
+                      className="patient-select"
+                      value={form.lifestyleSmoking ? "true" : "false"}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          lifestyleSmoking: e.target.value === "true",
+                        }))
+                      }
+                    >
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+
+                  <div className="patient-field">
+                    <label className="patient-label">Alcohol</label>
+                    <select
+                      className="patient-select"
+                      value={form.lifestyleAlcohol ? "true" : "false"}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          lifestyleAlcohol: e.target.value === "true",
+                        }))
+                      }
+                    >
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="patient-field-row patient-field-row-2">
+                  <div className="patient-field">
+                    <label className="patient-label">Diet</label>
+                    <input
+                      type="text"
+                      placeholder="Balanced diet"
+                      className="patient-input"
+                      value={form.lifestyleDiet || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          lifestyleDiet: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="patient-field">
+                    <label className="patient-label">Physical Activity</label>
+                    <input
+                      type="text"
+                      placeholder="Moderate exercise"
+                      className="patient-input"
+                      value={form.lifestylePhysicalActivity || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          lifestylePhysicalActivity: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
               </form>
 
               {/* Footer */}

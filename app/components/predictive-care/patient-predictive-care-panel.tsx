@@ -81,6 +81,8 @@ type TimelineEvent = {
   tone: "red" | "amber" | "sage" | "blue";
 };
 
+type InsightTab = "trends" | "composition" | "model" | "timeline";
+
 type ExtendedProfile = PredictiveCareProfile & {
   risk_delta_7d?: number;
   readmission_risk_30d?: number;
@@ -420,6 +422,7 @@ export default function PredictiveCarePanel({
   const [primaryTrendName, setPrimaryTrendName] = useState<string | null>(null);
   const [comparisonTrendName, setComparisonTrendName] = useState<string | null>(null);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
+  const [activeInsightTab, setActiveInsightTab] = useState<InsightTab>("trends");
 
   const trendOptions = useMemo(
     () =>
@@ -853,46 +856,6 @@ export default function PredictiveCarePanel({
                   </div>
                 </div>
               </WorkspaceCard>
-
-              <WorkspaceCard className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-slate-600">ML confidence & anomaly</p>
-                      <InfoBadge text="Confidence shows how stable the model output is. Anomaly highlights the series most likely driving outlier behavior." />
-                    </div>
-                    <p className="text-sm text-slate-500">Confidence and outlier signals tied to the latest patient data.</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-4">
-                    <div className="flex items-center gap-3">
-                      <span className={`h-3.5 w-3.5 rounded-full ${confidencePct != null && confidencePct >= 70 ? "bg-[#6B9080]" : confidencePct != null && confidencePct >= 40 ? "bg-[#D4A373]" : "bg-[#C45B5B]"}`} />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Confidence</p>
-                        <p className="text-sm text-slate-500">
-                          {confidencePct != null ? `${confidencePct.toFixed(0)}% confidence: ${confidencePct >= 70 ? "High" : confidencePct >= 40 ? "Moderate" : "Low"}` : pending("model calibration output")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3"><MiniSparkline points={(primaryTrend?.chart_data || []).filter((point) => typeof point.value === "number").map((point) => Number(point.value))} stroke="#7A9CC6" /></div>
-                  </div>
-                  <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-4">
-                    <div className="flex items-center gap-3">
-                      <span className={`h-3.5 w-3.5 rounded-full ${profile?.ml_is_anomaly ? "bg-[#C45B5B]" : "bg-[#6B9080]"}`} />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Anomaly signal</p>
-                        <p className="text-sm text-slate-500">
-                          {profile?.ml_is_anomaly
-                            ? `Triggered by ${anomalySeries}`
-                            : `No active anomaly. Pending data from ${anomalySeries}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3"><MiniSparkline points={(primaryTrend?.chart_data || []).filter((point) => typeof point.value === "number").map((point) => Number(point.value))} stroke="#C45B5B" /></div>
-                  </div>
-                </div>
-              </WorkspaceCard>
             </div>
           </div>
         ) : null}
@@ -962,8 +925,73 @@ export default function PredictiveCarePanel({
         </WorkspaceCard>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <WorkspaceCard className="p-6">
+        <SectionHeader
+          title="Clinical intelligence drill-down"
+          subtitle="Use these secondary views when you need chart context, score composition, model details, or event history."
+        />
+        <div className="mt-5 flex flex-wrap gap-2">
+          {[
+            { id: "trends", label: "Trend Explorer" },
+            { id: "composition", label: "Risk Composition" },
+            { id: "model", label: "Model Details" },
+            { id: "timeline", label: "Timeline" },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveInsightTab(item.id as InsightTab)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                activeInsightTab === item.id
+                  ? "bg-[var(--accent-sage)] text-white"
+                  : "border border-[#E5E7EB] bg-white text-slate-600 hover:bg-[#FAFBFC]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </WorkspaceCard>
+
+      {activeInsightTab === "model" ? (
         <WorkspaceCard className="p-6">
+          <SectionHeader
+            title="Model details"
+            subtitle="Confidence, anomaly state, and feature weights are supporting context for clinical judgment."
+            action={<InfoBadge text="These details explain model stability and drivers; they are not the primary care action." />}
+          />
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[16px] border border-[#E5E7EB] bg-[#FAFBFC] p-4">
+              <div className="flex items-center gap-3">
+                <span className={`h-3.5 w-3.5 rounded-full ${confidencePct != null && confidencePct >= 70 ? "bg-[#6B9080]" : confidencePct != null && confidencePct >= 40 ? "bg-[#D4A373]" : "bg-[#C45B5B]"}`} />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">ML confidence</p>
+                  <p className="text-sm text-slate-500">
+                    {confidencePct != null ? `${confidencePct.toFixed(0)}% confidence: ${confidencePct >= 70 ? "High" : confidencePct >= 40 ? "Moderate" : "Low"}` : pending("model calibration output")}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3"><MiniSparkline points={(primaryTrend?.chart_data || []).filter((point) => typeof point.value === "number").map((point) => Number(point.value))} stroke="#7A9CC6" /></div>
+            </div>
+            <div className="rounded-[16px] border border-[#E5E7EB] bg-[#FAFBFC] p-4">
+              <div className="flex items-center gap-3">
+                <span className={`h-3.5 w-3.5 rounded-full ${profile?.ml_is_anomaly ? "bg-[#C45B5B]" : "bg-[#6B9080]"}`} />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Anomaly signal</p>
+                  <p className="text-sm text-slate-500">
+                    {profile?.ml_is_anomaly ? `Triggered by ${anomalySeries}` : `No active anomaly. Pending data from ${anomalySeries}`}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3"><MiniSparkline points={(primaryTrend?.chart_data || []).filter((point) => typeof point.value === "number").map((point) => Number(point.value))} stroke="#C45B5B" /></div>
+            </div>
+          </div>
+        </WorkspaceCard>
+      ) : null}
+
+      {activeInsightTab === "trends" || activeInsightTab === "composition" ? (
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        <WorkspaceCard className={`${activeInsightTab === "trends" ? "p-6 xl:col-span-2" : "hidden"}`}>
           <SectionHeader
             title="Patient trend explorer"
             subtitle="Line chart with contextual banding, forecast cone, annotations, and optional overlay comparison"
@@ -1032,7 +1060,7 @@ export default function PredictiveCarePanel({
           </div>
         </WorkspaceCard>
 
-        <div className="grid gap-6">
+        <div className={`${activeInsightTab === "composition" ? "grid gap-6 xl:col-span-2 xl:grid-cols-2" : "hidden"}`}>
           <WorkspaceCard className="p-6">
             <SectionHeader
               title="Risk composition donut"
@@ -1087,7 +1115,9 @@ export default function PredictiveCarePanel({
           </WorkspaceCard>
         </div>
       </div>
+      ) : null}
 
+      {activeInsightTab === "timeline" ? (
       <WorkspaceCard className="p-6">
         <SectionHeader
           title="Timeline / history strip"
@@ -1107,6 +1137,7 @@ export default function PredictiveCarePanel({
           ))}
         </div>
       </WorkspaceCard>
+      ) : null}
     </div>
   );
 }

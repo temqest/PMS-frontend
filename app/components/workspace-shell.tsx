@@ -468,7 +468,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
             <div className="w-full max-w-[400px] rounded-[16px] bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
               <div className="flex items-center justify-center">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(107,144,128,0.08)] text-[var(--accent-sage)]">
+                <span className={`flex h-14 w-14 items-center justify-center rounded-full ${confirm.tone === "destructive" ? "bg-[rgba(239,68,68,0.10)] text-[#DC2626]" : "bg-[rgba(107,144,128,0.08)] text-[var(--accent-sage)]"}`}>
                   <CircleHelp className="h-6 w-6" strokeWidth={1.5} />
                 </span>
               </div>
@@ -488,7 +488,11 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                     confirm.onConfirm?.();
                     closeConfirm();
                   }}
-                  className="flex-1 rounded-[12px] bg-[#6B9080] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[#5f8273]"
+                  className={`flex-1 rounded-[12px] px-4 py-3 text-sm font-medium text-white transition-colors ${
+                    confirm.tone === "destructive"
+                      ? "bg-[#DC2626] hover:bg-[#B91C1C]"
+                      : "bg-[#6B9080] hover:bg-[#5f8273]"
+                  }`}
                 >
                   {confirm.confirmLabel ?? "Confirm"}
                 </button>

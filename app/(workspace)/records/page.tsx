@@ -90,7 +90,7 @@ const iconForType = (type: RecordType) => {
 };
 
 const tagsForRecord = (record: UiHealthRecord): string[] => {
-  const tags: string[] = [record.recordType];
+  const tags: string[] = [record.recordType, record.conditionCategory];
   if (record.saveState === "draft") tags.push("Draft");
   return tags;
 };

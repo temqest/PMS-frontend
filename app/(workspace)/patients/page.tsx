@@ -23,6 +23,28 @@ import api from "../../../lib/api";
 
 const initialPatients: any[] = [];
 
+const normalizePatientForModal = (patient: any) => ({
+  id: patient.patient_id || patient.id || "",
+  firstName: patient.first_name || "",
+  lastName: patient.last_name || "",
+  dateOfBirth: patient.date_of_birth ? String(patient.date_of_birth).slice(0, 10) : "",
+  sex: patient.gender || undefined,
+  phone: patient.contact_number || "",
+  email: patient.email_address || "",
+  street: patient.address || "",
+  emergencyContactName: patient.emergency_contact_name || "",
+  emergencyContactRelationship: patient.emergency_contact_relationship || "",
+  emergencyContactPhone: patient.emergency_contact_phone || "",
+  insuranceProvider: patient.insurance?.provider || patient.insurance_provider || "",
+  policyNumber: patient.insurance?.policy_number || patient.policy_number || "",
+  groupNumber: patient.insurance?.group_number || patient.group_number || "",
+  lifestyleSmoking: !!patient.lifestyle?.smoking,
+  lifestyleAlcohol: !!patient.lifestyle?.alcohol,
+  lifestyleDiet: patient.lifestyle?.diet || "",
+  lifestylePhysicalActivity: patient.lifestyle?.physical_activity || "",
+  isActive: (patient.status || "active") === "active",
+});
+
 export default function PatientsPage() {
   const router = useRouter();
   const { pushToast, requestConfirm } = useWorkspace();
@@ -246,6 +268,12 @@ export default function PatientsPage() {
               insurance_provider: form.insuranceProvider,
               policy_number: form.policyNumber,
               group_number: form.groupNumber,
+              lifestyle: {
+                smoking: !!form.lifestyleSmoking,
+                alcohol: !!form.lifestyleAlcohol,
+                diet: form.lifestyleDiet || "",
+                physical_activity: form.lifestylePhysicalActivity || "",
+              },
               notes: form.notes,
             });
 
@@ -278,7 +306,7 @@ export default function PatientsPage() {
             throw err;
           }
         }}
-        initialData={editPatient ?? undefined}
+        initialData={editPatient ? normalizePatientForModal(editPatient) : undefined}
         mode={editPatient?"edit":"create"}
       />
       <MessageModal isOpen={showMessageModal} onClose={() => setShowMessageModal(false)} onSend={(payload)=>{ pushToast({ type: 'success', title: 'Message sent', message: `To ${payload.to ?? 'recipient'}` }); }} recipient={messageRecipient} />

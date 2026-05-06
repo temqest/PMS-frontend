@@ -116,6 +116,15 @@ export type HealthRecordPayload = {
   details?: Record<string, unknown>;
 };
 
+export type ConditionCategory =
+  | "cardiovascular"
+  | "metabolic"
+  | "respiratory"
+  | "renal"
+  | "mental_health"
+  | "cancer"
+  | "uncategorized";
+
 export type UiHealthRecord = {
   id: string;
   title: string;
@@ -125,6 +134,7 @@ export type UiHealthRecord = {
   summary: string;
   recordType: HealthRecordType;
   saveState: HealthRecordSaveState;
+  conditionCategory: ConditionCategory;
   patient: PatientOption;
   details: Record<string, unknown>;
 };
@@ -193,6 +203,7 @@ export type UiAppointment = {
   id: string;
   time: string;
   date: string;
+  scheduledAtIso: string;
   name: string;
   patientId: string;
   type: "In-person" | "Telehealth";
@@ -205,6 +216,10 @@ export type UiAppointment = {
   sendSmsReminder: boolean;
   sendConfirmation: boolean;
   internalNotes: string;
+  createdAt: string;
+  updatedAt: string;
+  cancelledAt: string;
+  cancelReason: string;
 };
 
 export type PatientOption = { id: string; name: string };
@@ -246,6 +261,10 @@ export const mapAppointmentToUi = (item: Record<string, unknown>): UiAppointment
     send_sms_reminder?: boolean;
     send_confirmation?: boolean;
     internal_notes?: string;
+    created_at?: string;
+    updated_at?: string;
+    cancelled_at?: string;
+    cancel_reason?: string;
   };
   const scheduledAt = source.scheduled_at ? new Date(source.scheduled_at) : null;
   const hh = scheduledAt ? String(scheduledAt.getHours()).padStart(2, "0") : "09";
@@ -259,6 +278,7 @@ export const mapAppointmentToUi = (item: Record<string, unknown>): UiAppointment
     id: source.appointment_id || source._id || "",
     time: `${hh}:${mm}`,
     date: `${yyyy}-${mon}-${dd}`,
+    scheduledAtIso: source.scheduled_at || "",
     name: source.patient_name || "",
     patientId: source.patient_id || "",
     type: toUiType(source.appointment_type),
@@ -271,6 +291,10 @@ export const mapAppointmentToUi = (item: Record<string, unknown>): UiAppointment
     sendSmsReminder: !!source.send_sms_reminder,
     sendConfirmation: source.send_confirmation !== false,
     internalNotes: source.internal_notes || "",
+    createdAt: source.created_at || "",
+    updatedAt: source.updated_at || "",
+    cancelledAt: source.cancelled_at || "",
+    cancelReason: source.cancel_reason || "",
   };
 };
 
@@ -300,6 +324,7 @@ export const mapHealthRecordToUi = (item: Record<string, unknown>): UiHealthReco
     provider?: string;
     save_state?: HealthRecordSaveState;
     summary?: string;
+    condition_category?: ConditionCategory;
     details?: Record<string, unknown>;
   };
 
@@ -317,6 +342,7 @@ export const mapHealthRecordToUi = (item: Record<string, unknown>): UiHealthReco
     summary: source.summary || summaryFromDetails || "",
     recordType,
     saveState: source.save_state || "final",
+    conditionCategory: source.condition_category || "uncategorized",
     patient: {
       id: source.patient_id || "",
       name: source.patient_name || "",

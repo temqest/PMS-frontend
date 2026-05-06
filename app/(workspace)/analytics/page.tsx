@@ -13,7 +13,6 @@ import {
   Pill,
   ScanLine,
   UserRound,
-  MoreVertical,
 } from "lucide-react";
 
 import { useWorkspace } from "../../components/workspace-shell";
@@ -113,6 +112,13 @@ function levelToTone(level: string): "red" | "amber" | "sage" {
   if (level === "Critical" || level === "High") return "red";
   if (level === "Moderate") return "amber";
   return "sage";
+}
+
+function alertSeverityRank(severity?: string): number {
+  if (severity === "Critical") return 3;
+  if (severity === "Warning") return 2;
+  if (severity === "Info") return 1;
+  return 0;
 }
 
 function formatFetchTime(iso: string): string {
@@ -222,33 +228,40 @@ export default function AnalyticsPage() {
   const riskCards = useMemo(() => {
     const dist = dashboard?.riskDistribution;
     const ac = dashboard?.alertCounts;
-    const highCritical = bucketCount(dist, ["High", "Critical"]);
+    const high = bucketCount(dist, ["High"]);
+    const critical = bucketCount(dist, ["Critical"]);
+    const highCritical = high + critical;
     const moderate = bucketCount(dist, ["Moderate"]);
     const gaps = gapAlertSum(ac);
     const active = totalActiveAlerts(ac);
+    const criticalAlerts = alerts.filter((alert) => alert.severity === "Critical").length;
     return [
       {
         title: "High / critical risk",
         count: String(highCritical),
-        subtitle: "Patients flagged High or Critical",
+        subtitle: `${critical} Critical / ${high} High`,
+        tone: "red",
       },
       {
-        title: "Moderate risk",
-        count: String(moderate),
-        subtitle: "Monitor within standard windows",
+        title: "Active alerts",
+        count: String(active),
+        subtitle: `${criticalAlerts} critical unresolved`,
+        tone: "red",
       },
       {
         title: "Care gap alerts",
         count: String(gaps),
         subtitle: "Vaccination, adherence, lab trend (active)",
+        tone: "amber",
       },
       {
-        title: "Active alerts",
-        count: String(active),
-        subtitle: "Unresolved alerts (all types)",
+        title: "Moderate risk",
+        count: String(moderate),
+        subtitle: "Monitor within standard windows",
+        tone: "neutral",
       },
     ];
-  }, [dashboard]);
+  }, [dashboard, alerts]);
 
   const riskBars = useMemo(() => {
     const dist = dashboard?.riskDistribution ?? [];
@@ -274,7 +287,14 @@ export default function AnalyticsPage() {
   }, [dashboard]);
 
   const insightAlerts = useMemo(
-    () => alerts.slice(0, 6),
+    () =>
+      [...alerts]
+        .sort((a, b) => {
+          const severityDiff = alertSeverityRank(String(b.severity ?? "")) - alertSeverityRank(String(a.severity ?? ""));
+          if (severityDiff !== 0) return severityDiff;
+          return new Date(b.triggered_at ?? 0).getTime() - new Date(a.triggered_at ?? 0).getTime();
+        })
+        .slice(0, 5),
     [alerts]
   );
 
@@ -291,16 +311,20 @@ export default function AnalyticsPage() {
     (!topPatients || topPatients.length === 0);
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="grid grid-cols-1 gap-6 pb-8 xl:grid-cols-12">
+      <WorkspaceCard className="p-6 xl:order-1 xl:col-span-12">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Patient Intelligence
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Predictive insights to guide proactive care
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Patient Intelligence
+            </h1>
+            <Badge tone="blue">Decision support</Badge>
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Population triage for proactive care: who needs attention, why they were flagged, and where the care team should open the patient chart next.
           </p>
-          <p className="mt-2 inline-block rounded-full border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-1 text-xs text-slate-600">
+          <p className="mt-3 inline-block rounded-full border border-[#E5E7EB] bg-[#FAFBFC] px-3 py-1 text-xs text-slate-600">
             Population snapshot — date filters coming soon
           </p>
         </div>
@@ -333,9 +357,10 @@ export default function AnalyticsPage() {
           </button>
         </div>
       </div>
+      </WorkspaceCard>
 
       {hasNoProfiles ? (
-        <WorkspaceCard className="border-amber-200 bg-amber-50/60 p-6">
+        <WorkspaceCard className="border-amber-200 bg-amber-50/60 p-6 xl:order-2 xl:col-span-12">
           <p className="font-medium text-slate-900">
             No risk profiles computed yet
           </p>
@@ -350,9 +375,18 @@ export default function AnalyticsPage() {
       ) : null}
 
       {/* Risk overview KPIs */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:order-3 xl:col-span-12 xl:grid-cols-4">
         {riskCards.map((card) => (
-          <WorkspaceCard key={card.title} className="relative p-6">
+          <WorkspaceCard
+            key={card.title}
+            className={`relative p-5 ${
+              card.tone === "red"
+                ? "border-l-4 border-l-[#C45B5B]"
+                : card.tone === "amber"
+                  ? "border-l-4 border-l-[#D4A373]"
+                  : "bg-[#FAFBFC]"
+            }`}
+          >
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-white/70">
                 <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -360,7 +394,7 @@ export default function AnalyticsPage() {
             ) : null}
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-slate-600">{card.title}</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                 {card.count}
               </p>
               <p className="mt-2 text-xs text-slate-500">{card.subtitle}</p>
@@ -370,19 +404,19 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Active alerts */}
-      <div>
+      <div className="xl:order-5 xl:col-span-5">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">
-          Active alerts
+          Active alerts requiring action
         </h2>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4">
           {loading && insightAlerts.length === 0 ? (
             [...Array.from({ length: 4 })].map((_, i) => (
-              <WorkspaceCard key={i} className="flex h-44 items-center justify-center p-6">
+              <WorkspaceCard key={i} className="flex h-36 items-center justify-center p-6">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
               </WorkspaceCard>
             ))
           ) : insightAlerts.length === 0 ? (
-            <WorkspaceCard className="p-6 lg:col-span-2">
+            <WorkspaceCard className="p-6">
               <p className="text-sm text-slate-600">
                 No unresolved alerts. Profiles and compute jobs may not have run
                 yet for your population.
@@ -394,7 +428,7 @@ export default function AnalyticsPage() {
               const sevStyle = severityToRiskStyle(String(insight.severity ?? "Info"));
 
               return (
-                <WorkspaceCard key={insight._id ?? idx} className="flex flex-col gap-4 p-6">
+                <WorkspaceCard key={insight._id ?? idx} className="flex flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <span
@@ -427,10 +461,10 @@ export default function AnalyticsPage() {
                   </p>
                   {insight.patient_id ? (
                     <Link
-                      href={`/patients/${insight.patient_id}`}
+                      href={`/patients/${insight.patient_id}?tab=predictive`}
                       className="text-sm font-medium text-[#6B9080] hover:underline"
                     >
-                      View patient
+                      Open patient intelligence
                     </Link>
                   ) : null}
                 </WorkspaceCard>
@@ -441,13 +475,13 @@ export default function AnalyticsPage() {
       </div>
 
       {/* High-risk patients */}
-      <WorkspaceCard className="overflow-hidden">
+      <WorkspaceCard className="overflow-hidden xl:order-4 xl:col-span-7">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             Highest-risk patients
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            From predictive risk profiles (High / Critical tiers)
+            Worklist ranked by predictive risk profile with the first unresolved alert attached.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -529,25 +563,18 @@ export default function AnalyticsPage() {
                       <td className="px-6 py-4">
                         <Badge tone={levelToTone(String(level))}>{level}</Badge>
                       </td>
-                      <td className="max-w-xs truncate px-6 py-4 text-slate-600">
+                      <td className="max-w-xs px-6 py-4 text-slate-600">
                         {primary ?? "—"}
                       </td>
                       <td className="px-6 py-4">
                         {pid ? (
                           <Link
-                            href={`/patients/${pid}`}
+                            href={`/patients/${pid}?tab=predictive`}
                             className="font-medium text-[#6B9080] hover:underline"
                           >
-                            Open
+                            Open intelligence
                           </Link>
                         ) : null}
-                        <button
-                          type="button"
-                          className="ml-2 align-middle text-slate-400 hover:text-slate-600"
-                          aria-label="Row menu placeholder"
-                        >
-                          <MoreVertical className="h-5 w-5" strokeWidth={1.5} />
-                        </button>
                       </td>
                     </tr>
                   );
@@ -559,8 +586,8 @@ export default function AnalyticsPage() {
       </WorkspaceCard>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <WorkspaceCard className="p-6">
+      <div className="grid gap-6 lg:grid-cols-2 xl:order-6 xl:col-span-12 xl:grid-cols-12">
+        <WorkspaceCard className="p-6 xl:col-span-7">
           <h3 className="text-lg font-semibold text-slate-900">
             Risk level distribution
           </h3>
@@ -601,7 +628,7 @@ export default function AnalyticsPage() {
           </div>
         </WorkspaceCard>
 
-        <WorkspaceCard className="p-6">
+        <WorkspaceCard className="p-6 xl:col-span-5">
           <h3 className="text-lg font-semibold text-slate-900">
             Active alerts by type
           </h3>
