@@ -1,7 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, Mic, MicOff, PhoneOff, Video, VideoOff, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, Mic, MicOff, PhoneOff, Video, VideoOff, Wifi, WifiOff } from "lucide-react";
 import type { Socket } from "socket.io-client";
 
 import {
@@ -9,7 +10,9 @@ import {
   rtcConfiguration,
   type RoomJoinedPayload,
   type TelehealthAppointment,
+  type TelehealthCallInvite,
 } from "../../../lib/telehealth";
+import { getPortalPathForRole, getSessionClaims } from "../../../lib/session";
 
 type TelehealthCallProps = {
   appointmentId: string;
@@ -24,6 +27,8 @@ type CallStatus =
   | "Connected"
   | "Peer disconnected"
   | "Call ended";
+
+const staffRoles = new Set(["system_admin", "front_desk", "physician", "appointment_system"]);
 
 const getConnectionLabel = (state?: RTCPeerConnectionState) => {
   if (state === "connected") return "Connected";
@@ -48,6 +53,7 @@ const formatAppointmentTime = (appointment?: TelehealthAppointment | null) => {
 };
 
 export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
+  const router = useRouter();
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -63,6 +69,10 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [remoteConnected, setRemoteConnected] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState("Preparing call invite");
+  const claims = getSessionClaims();
+  const exitHref = getPortalPathForRole(claims?.role);
+  const exitLabel = claims?.role === "patient" ? "Back to portal" : "Back to dashboard";
 
   const cleanupPeerConnection = useCallback(() => {
     peerConnectionRef.current?.close();
@@ -158,8 +168,14 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
     endedRef.current = true;
     socketRef.current?.emit("call:end", { appointmentId });
     cleanupCall();
+    setInviteStatus("Call ended");
     setStatus("Call ended");
   }, [appointmentId, cleanupCall]);
+
+  const handleExitCall = useCallback(() => {
+    cleanupCall();
+    router.push(exitHref);
+  }, [cleanupCall, exitHref, router]);
 
   const toggleMic = useCallback(() => {
     const audioTracks = localStreamRef.current?.getAudioTracks() || [];
@@ -201,14 +217,61 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
         setStatus("Connecting to telehealth service");
         const socket = createTelehealthSocket();
         socketRef.current = socket;
+        const claims = getSessionClaims();
+        const shouldInitiateCall = staffRoles.has(claims?.role || "");
 
         socket.on("connect", () => {
+          console.info("[telehealth] call socket connected", { socketId: socket.id, appointmentId });
+          if (shouldInitiateCall) {
+            socket.emit("initiate-call", { appointmentId });
+            setInviteStatus("Calling patient");
+          } else {
+            setInviteStatus("Connected to call service");
+          }
           socket.emit("room:join", { appointmentId });
+        });
+
+        socket.on("disconnect", (reason) => {
+          console.info("[telehealth] call socket disconnected", { reason, appointmentId });
         });
 
         socket.on("connect_error", (err) => {
           setError(err.message || "Unable to connect to telehealth service.");
+          setInviteStatus("Telehealth service unavailable");
           setStatus("Peer disconnected");
+          console.warn("[telehealth] call socket connection error", { message: err.message, appointmentId });
+        });
+
+        socket.on("call-initiated", (payload: TelehealthCallInvite) => {
+          setInviteStatus(payload.patientOnline ? "Patient notified" : "Waiting for patient to come online");
+          console.info("[telehealth] call initiated", {
+            appointmentId: payload.appointmentId,
+            patientOnline: payload.patientOnline,
+          });
+        });
+
+        socket.on("call-patient-offline", (payload: TelehealthCallInvite) => {
+          setInviteStatus(payload.message || "Patient is offline");
+        });
+
+        socket.on("call-accepted", (payload: TelehealthCallInvite) => {
+          setInviteStatus(`${payload.patient?.fullName || "Patient"} accepted`);
+          setStatus("Peer joined, setting up media");
+        });
+
+        socket.on("call-rejected", (payload: TelehealthCallInvite) => {
+          setInviteStatus(`${payload.patient?.fullName || "Patient"} declined the call`);
+          setStatus("Peer disconnected");
+        });
+
+        socket.on("call-expired", (payload: TelehealthCallInvite) => {
+          setInviteStatus(payload.message || "Call invite expired");
+          setStatus("Peer disconnected");
+        });
+
+        socket.on("call-error", (payload: { message?: string }) => {
+          setInviteStatus(payload.message || "Unable to send call invite");
+          console.warn("[telehealth] call event error", { message: payload.message, appointmentId });
         });
 
         socket.on("room:joined", (payload: RoomJoinedPayload) => {
@@ -218,10 +281,12 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
         socket.on("room:error", (payload: { message?: string }) => {
           setError(payload.message || "Unable to join telehealth room.");
+          setInviteStatus("Room unavailable");
           setStatus("Peer disconnected");
         });
 
         socket.on("peer:joined", () => {
+          setInviteStatus("Patient joined room");
           setStatus("Peer joined, setting up media");
         });
 
@@ -267,17 +332,27 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
         socket.on("peer:left", () => {
           cleanupPeerConnection();
+          setInviteStatus("Participant left the room");
           setStatus("Peer disconnected");
         });
 
         socket.on("call:ended", () => {
           endedRef.current = true;
           cleanupCall();
+          setInviteStatus("Call ended");
+          setStatus("Call ended");
+        });
+
+        socket.on("call-ended", () => {
+          endedRef.current = true;
+          cleanupCall();
+          setInviteStatus("Call ended");
           setStatus("Call ended");
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to start the telehealth call.";
         setError(message);
+        setInviteStatus("Unable to start call");
         setStatus("Peer disconnected");
         cleanupCall();
       }
@@ -297,11 +372,8 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
         <div className="telehealth-hero">
           <div>
             <p className="telehealth-eyebrow">Secure Telehealth Room</p>
-            <h1>Appointment {appointmentId}</h1>
-            <p>
-              {appointment?.patient_name ? `${appointment.patient_name} · ` : ""}
-              {formatAppointmentTime(appointment)}
-            </p>
+            <h1>{appointment?.patient_name || "Telehealth Visit"}</h1>
+            <p>{formatAppointmentTime(appointment)}</p>
           </div>
           <div className="telehealth-status-pill">
             {connectionState === "connected" ? <Wifi size={16} /> : <WifiOff size={16} />}
@@ -341,18 +413,27 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
         </div>
 
         <div className="telehealth-controls">
-          <button type="button" onClick={toggleMic} className={!micEnabled ? "is-off" : ""}>
-            {micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-            <span>{micEnabled ? "Mute" : "Unmute"}</span>
-          </button>
-          <button type="button" onClick={toggleCamera} className={!cameraEnabled ? "is-off" : ""}>
-            {cameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}
-            <span>{cameraEnabled ? "Camera" : "Camera off"}</span>
-          </button>
-          <button type="button" onClick={handleEndCall} className="telehealth-end-button">
-            <PhoneOff size={20} />
-            <span>End call</span>
-          </button>
+          {status === "Call ended" ? (
+            <button type="button" onClick={handleExitCall} className="telehealth-exit-button">
+              <ArrowLeft size={20} />
+              <span>{exitLabel}</span>
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={toggleMic} className={!micEnabled ? "is-off" : ""}>
+                {micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                <span>{micEnabled ? "Mute" : "Unmute"}</span>
+              </button>
+              <button type="button" onClick={toggleCamera} className={!cameraEnabled ? "is-off" : ""}>
+                {cameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+                <span>{cameraEnabled ? "Camera" : "Camera off"}</span>
+              </button>
+              <button type="button" onClick={handleEndCall} className="telehealth-end-button">
+                <PhoneOff size={20} />
+                <span>End call</span>
+              </button>
+            </>
+          )}
         </div>
       </section>
 
@@ -362,9 +443,16 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
           <div>
             <p className="telehealth-card-label">Visit Status</p>
             <h2>{status}</h2>
-            <p>
-              WebRTC handles the encrypted audio/video peer connection. This service only relays setup signals.
-            </p>
+            <p>WebRTC handles the encrypted audio/video peer connection. This service only relays setup signals.</p>
+          </div>
+        </div>
+
+        <div className="telehealth-card">
+          <Clock3 size={22} />
+          <div>
+            <p className="telehealth-card-label">Call Invite</p>
+            <h2>{inviteStatus}</h2>
+            <p>Appointment room {appointmentId}</p>
           </div>
         </div>
 

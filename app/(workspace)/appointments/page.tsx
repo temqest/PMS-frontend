@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   addDays,
   addMonths,
@@ -27,6 +28,7 @@ import {
   Plus,
   RefreshCcw,
   X,
+  Video,
 } from "lucide-react";
 
 import { useWorkspace } from "../../components/workspace-shell";
@@ -122,6 +124,8 @@ const formatTimestamp = (value: string) => {
   if (Number.isNaN(date.getTime())) return "Not available";
   return format(date, "MMM d, yyyy 'at' h:mm a");
 };
+
+const getTelehealthRoomId = (item: UiAppointment) => (item.type === "Telehealth" ? item.id : "");
 
 export default function AppointmentsPage() {
   const { pushToast, requestConfirm } = useWorkspace();
@@ -219,6 +223,15 @@ export default function AppointmentsPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadLookupData]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selected]);
 
   const appointmentEntries = useMemo(() => {
     const mapped = appointments
@@ -697,9 +710,13 @@ export default function AppointmentsPage() {
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="truncate font-medium">{item.time}</span>
-                                  {item.priority === "Urgent" ? <span className="text-[10px] uppercase">Urgent</span> : null}
+                                  <div className="flex items-center gap-2">
+                                    {item.type === "Telehealth" ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : null}
+                                    {item.priority === "Urgent" ? <span className="text-[10px] uppercase">Urgent</span> : null}
+                                  </div>
                                 </div>
                                 <p className="mt-1 truncate text-[11px]">{item.name}</p>
+                                <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] opacity-80">{item.type}</p>
                               </button>
                             ))}
                             {dayEntries.length > 3 ? (
@@ -763,8 +780,10 @@ export default function AppointmentsPage() {
                               >
                                 <div className="flex min-w-0 items-center justify-between gap-2">
                                   <span className="font-medium">{item.time}</span>
+                                  {item.type === "Telehealth" ? <Video className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} /> : null}
                                 </div>
                                 <p className="mt-1 truncate">{item.name}</p>
+                                <p className="mt-1 text-[10px] uppercase tracking-[0.16em] opacity-75">{item.type}</p>
                               </button>
                             ))
                           )}
@@ -799,6 +818,7 @@ export default function AppointmentsPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-medium text-slate-900">{item.name}</p>
                               <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
+                              {item.type === "Telehealth" ? <Badge tone="blue">Telehealth</Badge> : null}
                               {item.priority === "Urgent" ? <Badge tone="amber">Urgent</Badge> : null}
                             </div>
                             <p className="mt-1 text-sm text-slate-500">{item.reason || item.type}</p>
@@ -837,12 +857,13 @@ export default function AppointmentsPage() {
                       className="w-full overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white p-4 text-left transition-colors hover:bg-[#FAFBFC]"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className="truncate font-medium text-slate-900">{item.name}</p>
-                            <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-500">{item.reason || item.type}</p>
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="truncate font-medium text-slate-900">{item.name}</p>
+                              <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
+                              {item.type === "Telehealth" ? <Badge tone="blue">Telehealth</Badge> : null}
+                            </div>
+                            <p className="mt-1 text-sm text-slate-500">{item.reason || item.type}</p>
                         </div>
                         <div className="shrink-0 text-left sm:text-right">
                           <p className="font-medium text-slate-900">{format(toAppointmentDate(item), "h:mm a")}</p>
@@ -889,6 +910,7 @@ export default function AppointmentsPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate font-medium text-slate-900">{item.name}</p>
                             <Badge tone={getStatusTone(item.status)}>{item.status}</Badge>
+                            {item.type === "Telehealth" ? <Badge tone="blue">Telehealth</Badge> : null}
                             {item.priority === "Urgent" ? <Badge tone="amber">Urgent</Badge> : null}
                           </div>
                           <p className="mt-1 text-sm text-slate-500">{item.reason || item.type}</p>
@@ -907,9 +929,16 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-[680px] rounded-[18px] bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
+      {selected && typeof document !== "undefined"
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center bg-black/45 px-4 py-6 backdrop-blur-[2px]"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="w-full max-w-[680px] max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[18px] bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Appointment Detail</p>
@@ -928,10 +957,11 @@ export default function AppointmentsPage() {
                 <X className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
               {[
                 ["Date/Time", formatAppointmentDateTime(selected)],
                 ["Duration", selected.duration],
+                ["Room ID", getTelehealthRoomId(selected) || "Not applicable"],
                 ["Reason", selected.reason || "General consultation"],
                 ["Priority", selected.priority],
                 ["Reminders", selected.sendEmailReminder || selected.sendSmsReminder ? "Enabled" : "Not enabled"],
@@ -983,9 +1013,11 @@ export default function AppointmentsPage() {
                 </button>
               ) : null}
             </div>
-          </div>
-        </div>
-      ) : null}
+            </div>
+        </div>,
+        document.body
+      )
+        : null}
 
       <AppointmentModal
         key={modalKey}

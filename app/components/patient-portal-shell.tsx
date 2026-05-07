@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { clearStoredSession, getPortalPathForRole, getSessionClaims } from "../../lib/session";
+import IncomingTelehealthCall from "./telehealth/IncomingTelehealthCall";
 
 const navItems = [
   { href: "/portal", label: "Dashboard", icon: Home },
@@ -72,6 +73,7 @@ export default function PatientPortalShell({ children }: { children: ReactNode }
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#F7F8FA_0%,#FFFFFF_42%,#FAFBFC_100%)] text-slate-900">
+      <IncomingTelehealthCall />
       <div className="mx-auto flex min-h-screen w-full max-w-7xl gap-6 px-4 py-4 sm:px-6 lg:px-8">
         <aside className="hidden w-72 shrink-0 flex-col rounded-[24px] border border-[#E5E7EB] bg-white/90 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] backdrop-blur lg:flex">
           <div className="rounded-[20px] border border-[#E5E7EB] bg-[linear-gradient(180deg,rgba(107,144,128,0.08),rgba(255,255,255,0.96))] p-4">

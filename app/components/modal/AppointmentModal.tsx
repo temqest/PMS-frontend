@@ -8,6 +8,8 @@ import {
   X,
   CheckCircle,
   AlertCircle,
+  Video,
+  MapPin,
 } from "lucide-react";
 import "./AppointmentModal.css";
 import type { PatientOption } from "../../../lib/api";
@@ -114,6 +116,15 @@ export default function AppointmentModal({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, isDirty, success, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -302,6 +313,36 @@ export default function AppointmentModal({
                 </div>
 
                 {/* Date, Time, Duration */}
+                <div className="appointment-field appointment-field-full">
+                  <label className="appointment-label">Appointment Mode</label>
+                  <div className="appointment-segmented-control" role="tablist" aria-label="Appointment mode">
+                    {([
+                      {
+                        value: "In-Person" as const,
+                        label: "In-person",
+                        icon: MapPin,
+                      },
+                      {
+                        value: "Telehealth" as const,
+                        label: "Telehealth / Video Call",
+                        icon: Video,
+                      },
+                    ]).map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={form.appointmentType === value}
+                        className={`appointment-segment ${form.appointmentType === value ? "active" : ""}`}
+                        onClick={() => setForm((prev) => ({ ...prev, appointmentType: value }))}
+                      >
+                        <Icon size={14} strokeWidth={1.75} />
+                        <span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="appointment-field-row appointment-field-row-3">
                   <div className="appointment-field">
                     <label className="appointment-label">Date</label>
