@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addDays,
@@ -124,6 +125,7 @@ const formatTimestamp = (value: string) => {
 
 export default function AppointmentsPage() {
   const { pushToast, requestConfirm } = useWorkspace();
+  const router = useRouter();
   const [view, setView] = useState<"List" | "Calendar" | "Timeline">("Calendar");
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("month");
   const [calendarDate, setCalendarDate] = useState(() => new Date());
@@ -974,6 +976,7 @@ export default function AppointmentsPage() {
               {selected.type === "Telehealth" ? (
                 <button
                   type="button"
+                  onClick={() => router.push(`/telehealth/${encodeURIComponent(selected.id)}`)}
                   className="rounded-[12px] bg-[var(--accent-sage)] px-4 py-3 text-sm font-medium text-white"
                 >
                   Start Telehealth

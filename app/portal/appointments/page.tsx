@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock3, Plus, X } from "lucide-react";
 
@@ -18,6 +19,7 @@ const formatWhen = (item: Appointment) => {
 };
 
 export default function PatientAppointmentsPage() {
+  const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<(typeof statusOptions)[number]>("All");
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,14 @@ export default function PatientAppointmentsPage() {
   const filtered = useMemo(() => {
     return appointments.filter((item) => filter === "All" || String(item.status || "Pending") === filter);
   }, [appointments, filter]);
+
+  const selectedAppointmentId = selected ? String(selected.appointment_id || selected.id || "") : "";
+  const canJoinTelehealth = Boolean(
+    selected &&
+      selectedAppointmentId &&
+      String(selected.appointment_type || "") === "Telehealth" &&
+      String(selected.status || "Pending") === "Confirmed"
+  );
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -210,6 +220,15 @@ export default function PatientAppointmentsPage() {
               </div>
 
               <div className="flex flex-col gap-2">
+                {canJoinTelehealth ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/telehealth/${encodeURIComponent(selectedAppointmentId)}`)}
+                    className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-2 text-sm font-medium text-white"
+                  >
+                    Join Telehealth
+                  </button>
+                ) : null}
                 <button type="button" onClick={() => handleRequestReschedule(selected)} className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-[var(--accent-sage)] px-4 py-2 text-sm font-medium text-white"><Clock3 className="h-4 w-4" strokeWidth={1.75} />Request reschedule</button>
                 <button type="button" onClick={() => handleRequestCancel(selected)} className="rounded-[12px] border border-[#E5E7EB] px-4 py-2 text-sm text-slate-600">Request cancellation</button>
               </div>

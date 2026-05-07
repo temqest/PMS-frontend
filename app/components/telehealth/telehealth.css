@@ -1,0 +1,279 @@
+.telehealth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(107, 144, 128, 0.24), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(122, 156, 198, 0.24), transparent 32%),
+    #0f172a;
+  color: #f8fafc;
+}
+
+.telehealth-stage,
+.telehealth-side-panel {
+  min-width: 0;
+}
+
+.telehealth-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.telehealth-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 22px;
+  background: rgba(15, 23, 42, 0.68);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.telehealth-eyebrow,
+.telehealth-card-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+}
+
+.telehealth-hero h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(28px, 4vw, 54px);
+  letter-spacing: -0.05em;
+}
+
+.telehealth-hero p {
+  margin: 0;
+  color: rgba(248, 250, 252, 0.72);
+}
+
+.telehealth-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(167, 243, 208, 0.28);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #d1fae5;
+  white-space: nowrap;
+}
+
+.telehealth-alert {
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(127, 29, 29, 0.42);
+  color: #fecaca;
+}
+
+.telehealth-video-grid {
+  position: relative;
+  flex: 1;
+  min-height: 560px;
+}
+
+.telehealth-video-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  background: #020617;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+}
+
+.telehealth-video-card-main {
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+}
+
+.telehealth-self-view {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: min(28vw, 320px);
+  min-width: 220px;
+  aspect-ratio: 4 / 3;
+  border-radius: 22px;
+}
+
+.telehealth-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #020617;
+}
+
+.telehealth-placeholder,
+.telehealth-camera-off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.84), rgba(30, 41, 59, 0.72)),
+    radial-gradient(circle at center, rgba(107, 144, 128, 0.28), transparent 42%);
+}
+
+.telehealth-placeholder p,
+.telehealth-camera-off span {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.telehealth-placeholder small {
+  color: rgba(248, 250, 252, 0.68);
+}
+
+.telehealth-pulse {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #a7f3d0;
+  box-shadow: 0 0 0 0 rgba(167, 243, 208, 0.56);
+  animation: telehealth-pulse 1.6s ease-out infinite;
+}
+
+.telehealth-video-label {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 13px;
+  backdrop-filter: blur(10px);
+}
+
+.telehealth-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(18px);
+}
+
+.telehealth-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-weight: 700;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.telehealth-controls button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.telehealth-controls button.is-off {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fde68a;
+}
+
+.telehealth-controls .telehealth-end-button {
+  background: #dc2626;
+  border-color: #ef4444;
+}
+
+.telehealth-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.telehealth-card {
+  display: flex;
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.68);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.telehealth-card h2 {
+  margin: 8px 0;
+  font-size: 20px;
+}
+
+.telehealth-card p {
+  margin: 0;
+  color: rgba(248, 250, 252, 0.68);
+  line-height: 1.6;
+}
+
+.telehealth-tips {
+  display: block;
+}
+
+@keyframes telehealth-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(167, 243, 208, 0.56);
+  }
+  100% {
+    box-shadow: 0 0 0 18px rgba(167, 243, 208, 0);
+  }
+}
+
+@media (max-width: 980px) {
+  .telehealth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .telehealth-side-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .telehealth-shell {
+    padding: 14px;
+  }
+
+  .telehealth-hero,
+  .telehealth-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .telehealth-video-grid,
+  .telehealth-video-card-main {
+    min-height: 460px;
+  }
+
+  .telehealth-self-view {
+    right: 14px;
+    bottom: 14px;
+    width: 42vw;
+    min-width: 150px;
+  }
+}
