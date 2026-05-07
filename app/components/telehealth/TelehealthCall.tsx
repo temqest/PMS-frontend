@@ -69,6 +69,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [remoteConnected, setRemoteConnected] = useState(false);
+  const [remoteVideoOrientation, setRemoteVideoOrientation] = useState<"unknown" | "portrait" | "landscape" | "square">("unknown");
   const [inviteStatus, setInviteStatus] = useState("Preparing call invite");
   const claims = getSessionClaims();
   const exitHref = getPortalPathForRole(claims?.role);
@@ -82,6 +83,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
       remoteVideoRef.current.srcObject = null;
     }
     setRemoteConnected(false);
+    setRemoteVideoOrientation("unknown");
   }, []);
 
   const cleanupMedia = useCallback(() => {
@@ -366,6 +368,40 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
     };
   }, [appointmentId, cleanupCall, cleanupPeerConnection, createOffer, getPeerConnection]);
 
+  useEffect(() => {
+    const remoteVideo = remoteVideoRef.current;
+    if (!remoteVideo) return;
+
+    const syncRemoteVideoOrientation = () => {
+      const { videoWidth, videoHeight } = remoteVideo;
+      if (!videoWidth || !videoHeight) {
+        setRemoteVideoOrientation("unknown");
+        return;
+      }
+
+      if (videoHeight > videoWidth) {
+        setRemoteVideoOrientation("portrait");
+        return;
+      }
+
+      if (videoWidth > videoHeight) {
+        setRemoteVideoOrientation("landscape");
+        return;
+      }
+
+      setRemoteVideoOrientation("square");
+    };
+
+    remoteVideo.addEventListener("loadedmetadata", syncRemoteVideoOrientation);
+    remoteVideo.addEventListener("resize", syncRemoteVideoOrientation);
+    syncRemoteVideoOrientation();
+
+    return () => {
+      remoteVideo.removeEventListener("loadedmetadata", syncRemoteVideoOrientation);
+      remoteVideo.removeEventListener("resize", syncRemoteVideoOrientation);
+    };
+  }, [remoteConnected]);
+
   return (
     <main className="telehealth-shell">
       <section className="telehealth-stage">
@@ -388,8 +424,11 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
         ) : null}
 
         <div className="telehealth-video-grid">
-          <div className="telehealth-video-card telehealth-video-card-main">
-            <video ref={remoteVideoRef} autoPlay playsInline className="telehealth-video" />
+          <div
+            className="telehealth-video-card telehealth-video-card-main"
+            data-remote-orientation={remoteVideoOrientation}
+          >
+            <video ref={remoteVideoRef} autoPlay playsInline className="telehealth-video telehealth-video-remote" />
             {!remoteConnected ? (
               <div className="telehealth-placeholder">
                 <span className="telehealth-pulse" />
@@ -401,7 +440,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
           </div>
 
           <div className="telehealth-video-card telehealth-self-view">
-            <video ref={localVideoRef} autoPlay muted playsInline className="telehealth-video" />
+            <video ref={localVideoRef} autoPlay muted playsInline className="telehealth-video telehealth-video-local" />
             {!cameraEnabled ? (
               <div className="telehealth-camera-off">
                 <VideoOff size={22} />
