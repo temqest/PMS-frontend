@@ -6,18 +6,18 @@ import {
   ArrowRight,
   CalendarDays,
   FileText,
-  MessageSquare,
-  NotebookText,
   Pill,
   Plus,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AppointmentModal from "../../components/modal/AppointmentModal";
 import PatientModal from "../../components/modal/PatientModal";
 import PrescriptionModal from "../../components/modal/PrescriptionModal";
+import RecordModal, { type RecordForm } from "../../components/modal/RecordModal";
 import {
   createAppointment,
+  createHealthRecord,
   createPrescription,
   getAppointments,
   getHealthRecords,
@@ -59,9 +59,33 @@ const isSameDay = (value: Date, target: Date) =>
   value.getMonth() === target.getMonth() &&
   value.getDate() === target.getDate();
 
-const minutesFromNow = (iso: string) => {
-  const ms = new Date(iso).getTime() - Date.now();
-  return Math.round(ms / (1000 * 60));
+const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
+
+const isOnOrAfter = (value: Date, target: Date) => value.getTime() >= target.getTime();
+
+const isWithinLastDays = (value: Date, days: number, anchor: Date) => {
+  const dayStart = startOfDay(anchor);
+  const rangeStart = new Date(dayStart);
+  rangeStart.setDate(rangeStart.getDate() - (days - 1));
+  return value.getTime() >= rangeStart.getTime() && value.getTime() <= anchor.getTime();
+};
+
+const recordSummary = (record: RecordForm) => {
+  if (record.recordType === "Visit") return record.visitAssessment || record.visitReason;
+  if (record.recordType === "Lab Result") return record.labNotes;
+  if (record.recordType === "Imaging") return record.imagingImpression || record.imagingFindings;
+  if (record.recordType === "Prescription") return record.prescriptionDirections;
+  if (record.recordType === "Vaccination") return record.vaccinationNotes;
+  return record.noteContent;
+};
+
+const recordTitle = (record: RecordForm) => {
+  if (record.recordType === "Visit") return record.visitType;
+  if (record.recordType === "Lab Result") return record.labTestName;
+  if (record.recordType === "Imaging") return record.imagingStudyType;
+  if (record.recordType === "Prescription") return record.prescriptionMedicationName;
+  if (record.recordType === "Vaccination") return record.vaccinationName;
+  return record.noteType;
 };
 
 export default function DashboardPage() {
@@ -69,10 +93,10 @@ export default function DashboardPage() {
   const [showAppt, setShowAppt] = useState(false);
   const [showPatient, setShowPatient] = useState(false);
   const [showPrescription, setShowPrescription] = useState(false);
+  const [showRecord, setShowRecord] = useState(false);
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
-  const [nowTs] = useState(() => Date.now());
 
   const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
     if (Array.isArray(resp)) return resp as Record<string, unknown>[];
@@ -83,40 +107,45 @@ export default function DashboardPage() {
     return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
   };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [patientResp, appointmentResp, recordResp] = await Promise.all([
-          getPatients("?limit=200"),
-          getAppointments({ limit: 200 }),
-          getHealthRecords({ limit: 200 }),
-        ]);
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [patientResp, appointmentResp, recordResp] = await Promise.all([
+        getPatients("?limit=200"),
+        getAppointments({ limit: 200 }),
+        getHealthRecords({ limit: 200 }),
+      ]);
 
-        const patientRows = extractRows(patientResp as unknown, ["patients", "results"]);
-        const patientOptions: PatientOption[] = Array.isArray(patientRows)
-          ? patientRows
-              .map((item: Record<string, unknown>) => ({
-                id: String(item.patient_id || ""),
-                name: `${String(item.first_name || "")} ${String(item.last_name || "")}`.trim(),
-              }))
-              .filter((item: PatientOption) => item.id && item.name)
-          : [];
-        setPatients(patientOptions);
+      const patientRows = extractRows(patientResp as unknown, ["patients", "results"]);
+      const patientOptions: PatientOption[] = Array.isArray(patientRows)
+        ? patientRows
+            .map((item: Record<string, unknown>) => ({
+              id: String(item.patient_id || ""),
+              name: `${String(item.first_name || "")} ${String(item.last_name || "")}`.trim(),
+            }))
+            .filter((item: PatientOption) => item.id && item.name)
+        : [];
+      setPatients(patientOptions);
 
-        const appointmentRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
-        setAppointments(
-          Array.isArray(appointmentRows) ? appointmentRows.map(mapAppointmentToUi) : []
-        );
+      const appointmentRows = extractRows(appointmentResp as unknown, ["appointments", "results"]);
+      setAppointments(
+        Array.isArray(appointmentRows) ? appointmentRows.map(mapAppointmentToUi) : []
+      );
 
-        const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
-        setRecords(Array.isArray(recordRows) ? recordRows.map(mapHealthRecordToUi) : []);
-      } catch {
-        setPatients([]);
-        setAppointments([]);
-        setRecords([]);
-      }
-    })();
+      const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
+      setRecords(Array.isArray(recordRows) ? recordRows.map(mapHealthRecordToUi) : []);
+    } catch {
+      setPatients([]);
+      setAppointments([]);
+      setRecords([]);
+    }
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadDashboardData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadDashboardData]);
 
   const today = new Date();
   const todayAppointments = appointments
@@ -126,29 +155,40 @@ export default function DashboardPage() {
         new Date(`${a.date}T${a.time}:00`).getTime() -
         new Date(`${b.date}T${b.time}:00`).getTime()
     );
-  const pendingRecords = records.filter((item) => item.saveState === "draft").length;
-  const upcoming = appointments
-    .filter((item) => new Date(`${item.date}T${item.time}:00`).getTime() >= nowTs)
-    .sort(
-      (a, b) =>
-        new Date(`${a.date}T${a.time}:00`).getTime() -
-        new Date(`${b.date}T${b.time}:00`).getTime()
-    );
-  const avgWaitMinutes =
-    upcoming.length > 0
-      ? Math.max(
-          0,
-          Math.round(
-            upcoming
-              .slice(0, Math.min(5, upcoming.length))
-              .reduce(
-                (sum, item) =>
-                  sum + minutesFromNow(`${item.date}T${item.time}:00`),
-                0
-              ) / Math.min(5, upcoming.length)
-          )
-        )
-      : 0;
+  const activePrescriptionCount = records.filter((item) => {
+    if (item.recordType !== "Prescription" || item.saveState !== "final") return false;
+
+    const details = item.details || {};
+    const startDateValue =
+      typeof details.startDate === "string"
+        ? details.startDate
+        : typeof details.prescriptionStartDate === "string"
+          ? details.prescriptionStartDate
+          : "";
+    const endDateValue =
+      typeof details.endDate === "string"
+        ? details.endDate
+        : typeof details.prescriptionEndDate === "string"
+          ? details.prescriptionEndDate
+          : "";
+
+    const todayStart = startOfDay(today);
+    const startDate = startDateValue ? startOfDay(new Date(startDateValue)) : null;
+    const endDate = endDateValue ? startOfDay(new Date(endDateValue)) : null;
+
+    if (startDate && Number.isNaN(startDate.getTime())) return false;
+    if (endDate && Number.isNaN(endDate.getTime())) return false;
+    if (startDate && !isOnOrAfter(todayStart, startDate)) return false;
+    if (endDate && endDate.getTime() < todayStart.getTime()) return false;
+
+    return true;
+  }).length;
+  const newRecordsThisWeek = records.filter((item) => {
+    if (item.saveState !== "final" || !item.dateIso) return false;
+    const recordDate = new Date(item.dateIso);
+    if (Number.isNaN(recordDate.getTime())) return false;
+    return isWithinLastDays(recordDate, 7, today);
+  }).length;
 
   const stats = [
     { icon: Users, value: `${patients.length}`, label: "Total Patients", trend: "Live", positive: true },
@@ -161,15 +201,15 @@ export default function DashboardPage() {
     },
     {
       icon: FileText,
-      value: `${pendingRecords}`,
-      label: "Pending Records",
-      trend: "Live",
-      positive: pendingRecords === 0,
+      value: `${newRecordsThisWeek}`,
+      label: "New Health Records This Week",
+      trend: "7 days",
+      positive: true,
     },
     {
-      icon: NotebookText,
-      value: `${avgWaitMinutes}m`,
-      label: "Average Wait Time",
+      icon: Pill,
+      value: `${activePrescriptionCount}`,
+      label: "Active Prescriptions",
       trend: "Live",
       positive: true,
     },
@@ -208,7 +248,7 @@ export default function DashboardPage() {
             <ActionButton icon={Plus} label="New Appointment" onClick={() => setShowAppt(true)} />
             <ActionButton icon={Users} label="Add Patient" onClick={() => setShowPatient(true)} />
             <ActionButton icon={Pill} label="Write Prescription" onClick={() => setShowPrescription(true)} />
-            <ActionButton icon={MessageSquare} label="Send Message" onClick={() => pushToast({ type: "success", title: "Message composer", message: "Open secure messaging for the selected patient." })} />
+            <ActionButton icon={FileText} label="Add Health Record" onClick={() => setShowRecord(true)} />
           </div>
         </WorkspaceCard>
 
@@ -263,11 +303,40 @@ export default function DashboardPage() {
             send_confirmation: data.sendConfirmation !== false,
             internal_notes: data.internalNotes || "",
           });
+          await loadDashboardData();
           pushToast({type:'success', title: 'Booked', message: `Appointment ${data.date} ${data.time}`});
         }}
         mode="create"
       />
       <PatientModal isOpen={showPatient} onClose={() => setShowPatient(false)} onSubmit={(data)=>{ pushToast({type:'success', title: 'Patient added', message: `${data.firstName} ${data.lastName} created.`}); }} mode="create" />
+      <RecordModal
+        isOpen={showRecord}
+        onClose={() => setShowRecord(false)}
+        patients={patients}
+        onSubmit={async (record) => {
+          await createHealthRecord({
+            patient_id: record.patient?.id || "",
+            patient_name: record.patient?.name || "",
+            record_type: record.recordType,
+            record_date: record.date,
+            provider: record.provider,
+            save_state: record.saveState,
+            summary: recordSummary(record),
+            details: {
+              title: recordTitle(record),
+              summary: recordSummary(record),
+              ...record,
+            },
+          });
+          await loadDashboardData();
+          setShowRecord(false);
+          pushToast({
+            type: "success",
+            title: "Health record created",
+            message: `${record.recordType} added successfully.`,
+          });
+        }}
+      />
       <PrescriptionModal
         isOpen={showPrescription}
         onClose={() => setShowPrescription(false)}
@@ -283,6 +352,7 @@ export default function DashboardPage() {
             start_date: data.startDate || new Date().toISOString().slice(0, 10),
             end_date: data.endDate || "",
           });
+          await loadDashboardData();
           pushToast({
             type: "success",
             title: "Prescription sent",

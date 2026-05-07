@@ -1,3 +1,4 @@
+import AuthGuard from "../components/auth-guard";
 import PatientPortalShell from "../components/patient-portal-shell";
 
 export default function PortalLayout({
@@ -5,5 +6,9 @@ export default function PortalLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <PatientPortalShell>{children}</PatientPortalShell>;
+  return (
+    <AuthGuard area="portal">
+      <PatientPortalShell>{children}</PatientPortalShell>
+    </AuthGuard>
+  );
 }

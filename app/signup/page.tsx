@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { AuthButton, AuthField, AuthPasswordField, BrandMark, PasswordStrength } from "../components/clinic-ui";
 import SharedDatePicker from "../components/SharedDatePicker";
-import { decodeSessionToken, getPortalPathForRole } from "../../lib/session";
+import { decodeSessionToken, getPortalPathForRole, storeSessionToken } from "../../lib/session";
 
 type FormState = {
   firstName: string;
@@ -185,7 +185,7 @@ export default function SignUpPage() {
         if (!res.ok) throw new Error(data.message || data.error || (data && data.data && data.data.message) || "Registration failed");
         const token = data.token || (data.data && data.data.token);
         if (token) {
-          localStorage.setItem("pms_token", token);
+          storeSessionToken(token);
           const claims = decodeSessionToken(token);
           window.location.href = getPortalPathForRole(claims?.role);
         } else {

@@ -4,6 +4,8 @@ export type SessionClaims = {
   patient_id?: string | null;
   fullName?: string;
   scope?: string[];
+  exp?: number;
+  iat?: number;
 };
 
 function decodeBase64Url(value: string) {
@@ -20,6 +22,23 @@ export function getStoredToken() {
   }
 }
 
+export function storeSessionToken(token: string) {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem("pms_token", token);
+
+  const claims = decodeSessionToken(token);
+  const maxAge = claims?.exp ? Math.max(0, claims.exp - Math.floor(Date.now() / 1000)) : 60 * 60;
+  document.cookie = `pms_token=${encodeURIComponent(token)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+}
+
+export function clearStoredSession() {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem("pms_token");
+  document.cookie = "pms_token=; Max-Age=0; Path=/; SameSite=Lax";
+}
+
 export function decodeSessionToken(token: string): SessionClaims | null {
   try {
     const parts = token.split(".");
@@ -34,6 +53,11 @@ export function decodeSessionToken(token: string): SessionClaims | null {
 export function getSessionClaims() {
   const token = getStoredToken();
   return token ? decodeSessionToken(token) : null;
+}
+
+export function isTokenExpired(claims: SessionClaims | null, skewSeconds = 30) {
+  if (!claims?.exp) return false;
+  return claims.exp <= Math.floor(Date.now() / 1000) + skewSeconds;
 }
 
 export function getPortalPathForRole(role?: string | null) {

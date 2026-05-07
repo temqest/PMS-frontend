@@ -1,3 +1,4 @@
+import AuthGuard from "../components/auth-guard";
 import WorkspaceShell from "../components/workspace-shell";
 
 export default function WorkspaceLayout({
@@ -5,5 +6,9 @@ export default function WorkspaceLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <WorkspaceShell>{children}</WorkspaceShell>;
+  return (
+    <AuthGuard area="workspace">
+      <WorkspaceShell>{children}</WorkspaceShell>
+    </AuthGuard>
+  );
 }

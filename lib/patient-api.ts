@@ -1,3 +1,5 @@
+import { clearStoredSession } from "./session";
+
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -34,6 +36,14 @@ async function request(path: string, opts: RequestInit = {}) {
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   const body = await readBody(res);
   if (!res.ok) {
+    if (res.status === 401) {
+      clearStoredSession();
+      if (typeof window !== "undefined") {
+        const next = `${window.location.pathname}${window.location.search}`;
+        window.location.replace(`/login?next=${encodeURIComponent(next)}`);
+      }
+    }
+
     const message = body && typeof body === "object" && "message" in body ? String((body as Record<string, unknown>).message || "") : "";
     const error = new Error(message || `Request failed (${res.status})`) as Error & { status?: number };
     error.status = res.status;

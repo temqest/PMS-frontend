@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { AuthButton, AuthField, AuthPasswordField, BrandMark } from "../components/clinic-ui";
-import { decodeSessionToken, getPortalPathForRole } from "../../lib/session";
+import { decodeSessionToken, getPortalPathForRole, storeSessionToken } from "../../lib/session";
+
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "";
+  return value;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,9 +34,11 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.message || data.error || (data && data.data && data.data.message) || "Login failed");
       const token = data.token || (data.data && data.data.token);
       if (token) {
-        localStorage.setItem("pms_token", token);
+        storeSessionToken(token);
         const claims = decodeSessionToken(token);
-        router.push(getPortalPathForRole(claims?.role));
+        const nextPath =
+          typeof window === "undefined" ? "" : getSafeNextPath(new URLSearchParams(window.location.search).get("next"));
+        router.push(nextPath || getPortalPathForRole(claims?.role));
       } else {
         throw new Error("No token received");
       }

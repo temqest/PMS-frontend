@@ -12,7 +12,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 
-import { getPortalPathForRole, getSessionClaims } from "../../lib/session";
+import { clearStoredSession, getPortalPathForRole, getSessionClaims } from "../../lib/session";
 
 const navItems = [
   { href: "/portal", label: "Dashboard", icon: Home },
@@ -62,11 +62,7 @@ export default function PatientPortalShell({ children }: { children: ReactNode }
   }, [pathname]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem("pms_token");
-    } catch {
-      // ignore
-    }
+    clearStoredSession();
     router.replace("/login");
   };
 

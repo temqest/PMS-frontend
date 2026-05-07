@@ -241,6 +241,7 @@
 .record-input-icon-left-select { left: 16px; }
 
 .record-search-input { padding-left: 42px; }
+.record-select-with-icon .record-select { padding-left: 42px; }
 .record-select { appearance: none; padding-right: 34px; }
 .record-select-caret {
   position: absolute;

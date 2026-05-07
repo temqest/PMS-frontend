@@ -19,7 +19,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { getSessionClaims } from "../../lib/session";
+import { clearStoredSession, getSessionClaims } from "../../lib/session";
 import {
   createContext,
   useCallback,
@@ -127,13 +127,12 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const [confirm, setConfirm] = useState<ConfirmOptions | null>(null);
   const [query, setQuery] = useState("");
   const [activeResult, setActiveResult] = useState(0);
-  const [isStaff, setIsStaff] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
+  const isStaff = useMemo(() => {
     const claims = getSessionClaims();
-    const staffRoles = ['system_admin', 'front_desk', 'physician'];
-    setIsStaff(claims && staffRoles.includes(claims.role || '') ? true : false);
+    const staffRoles = ["system_admin", "front_desk"];
+    return Boolean(claims && staffRoles.includes(claims.role || ""));
   }, []);
 
   const activeMeta = pathname.startsWith("/patients/")
@@ -206,11 +205,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   );
 
   const handleLogout = useCallback(() => {
-    try {
-      localStorage.removeItem("pms_token");
-    } catch (e) {
-      // ignore
-    }
+    clearStoredSession();
     router.push("/");
   }, [router]);
 
@@ -368,7 +363,9 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="min-h-screen bg-white px-4 pb-24 pt-20 lg:px-8 lg:pl-[calc(var(--sidebar-width)+2rem)] lg:pb-8">
-          <div className="mx-auto max-w-[1440px]">{children}</div>
+          <div key={pathname} className="workspace-content-enter mx-auto max-w-[1440px]">
+            {children}
+          </div>
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#E5E7EB] bg-white shadow-[0_-1px_3px_rgba(0,0,0,0.04)] lg:hidden">
