@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Calendar as CalendarIcon,
   Search,
@@ -160,9 +161,14 @@ export default function AppointmentModal({
     }
   };
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -501,6 +507,8 @@ export default function AppointmentModal({
           )}
         </div>
       </div>
-    </>
+
+    </>,
+    document.body
   );
 }

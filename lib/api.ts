@@ -1,4 +1,5 @@
 import { clearStoredSession } from "./session";
+import { pushAuthDebug } from "./auth-debug";
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -53,11 +54,28 @@ async function request(path: string, opts: RequestInit = {}) {
     baseHeaders["Content-Type"] = "application/json";
   }
   const headers = Object.assign(baseHeaders, authHeader(), opts.headers || {});
+  pushAuthDebug("api.request", {
+    path,
+    method: opts.method || "GET",
+    hasAuthHeader: Boolean((headers as Record<string, string>).Authorization),
+  });
 
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   const body = await readResponseBody(res);
   if (!res.ok) {
+    pushAuthDebug("api.response_error", {
+      path,
+      method: opts.method || "GET",
+      status: res.status,
+      bodyType: typeof body,
+      pathname: typeof window !== "undefined" ? window.location.pathname : "",
+    }, res.status === 401 ? "warn" : "error");
     if (res.status === 401) {
+      pushAuthDebug("api.401_forcing_logout", {
+        path,
+        method: opts.method || "GET",
+        nextPath: typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "",
+      }, "warn");
       clearStoredSession();
       if (typeof window !== "undefined") {
         const next = `${window.location.pathname}${window.location.search}`;
@@ -93,6 +111,64 @@ async function request(path: string, opts: RequestInit = {}) {
     const record = body as Record<string, unknown>;
     return record.token || record.data || body;
   }
+  return body;
+}
+
+async function requestEnvelope(path: string, opts: RequestInit = {}) {
+  const hasBody = typeof opts.body !== "undefined" && opts.body !== null;
+  const isFormData = typeof FormData !== "undefined" && opts.body instanceof FormData;
+  const baseHeaders: Record<string, string> = { Accept: "application/json" };
+  if (hasBody && !isFormData) {
+    baseHeaders["Content-Type"] = "application/json";
+  }
+  const headers = Object.assign(baseHeaders, authHeader(), opts.headers || {});
+  pushAuthDebug("api.request_envelope", {
+    path,
+    method: opts.method || "GET",
+    hasAuthHeader: Boolean((headers as Record<string, string>).Authorization),
+  });
+
+  const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+  const body = await readResponseBody(res);
+  if (!res.ok) {
+    pushAuthDebug("api.envelope_response_error", {
+      path,
+      method: opts.method || "GET",
+      status: res.status,
+      bodyType: typeof body,
+      pathname: typeof window !== "undefined" ? window.location.pathname : "",
+    }, res.status === 401 ? "warn" : "error");
+    if (res.status === 401) {
+      pushAuthDebug("api.envelope_401_forcing_logout", {
+        path,
+        method: opts.method || "GET",
+        nextPath: typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "",
+      }, "warn");
+      clearStoredSession();
+      if (typeof window !== "undefined") {
+        const next = `${window.location.pathname}${window.location.search}`;
+        window.location.replace(`/login?next=${encodeURIComponent(next)}`);
+      }
+    }
+
+    const messageFromJson =
+      body && typeof body === "object" && "message" in (body as Record<string, unknown>)
+        ? (body as { message?: unknown }).message
+        : undefined;
+    const message =
+      typeof messageFromJson === "string" && messageFromJson.trim()
+        ? messageFromJson
+        : typeof body === "string" && body.trim()
+          ? body
+          : `Request failed (${res.status})`;
+
+    const error = new Error(message) as Error & { status: number; body: unknown; path: string };
+    error.status = res.status;
+    error.body = body;
+    error.path = path;
+    throw error;
+  }
+
   return body;
 }
 
@@ -308,6 +384,31 @@ export const mapAppointmentToUi = (item: Record<string, unknown>): UiAppointment
   };
 };
 
+export type AuditLogItem = {
+  _id: string;
+  user_id?: string | null;
+  action_type: string;
+  details: string;
+  ip_addr?: string;
+  subsystem: string;
+  created_at: string;
+};
+
+export type AuditLogsResponse = {
+  status?: string;
+  results?: number;
+  pagination?: {
+    total: number;
+    page: number;
+    pages: number;
+    limit: number;
+  };
+  data?: {
+    audit_logs?: AuditLogItem[];
+    audit_log?: AuditLogItem;
+  };
+};
+
 const toUiRecordDate = (value?: string) => {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return "";
@@ -483,6 +584,24 @@ export const createPrescription = (payload: PrescriptionPayload) =>
   createHealthRecord(toPrescriptionHealthRecordPayload(payload));
 export const createPrescriptionInvoice = (payload: PrescriptionInvoicePayload) =>
   request(`/api/v1/prescription-invoices`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const getAuditLogs = (params?: Record<string, string | number | undefined>) =>
+  requestEnvelope(`/api/v1/audit-logs${makeQuery(params)}`) as Promise<AuditLogsResponse>;
+
+export const getAuditLog = (id: string) =>
+  request(`/api/v1/audit-logs/${encodeURIComponent(id)}`) as Promise<{ audit_log?: AuditLogItem }>;
+
+export const logout = () => request(`/api/v1/auth/logout`, { method: "POST" });
+
+export const recordTelehealthAuditEvent = (
+  actionType: "START_TELEHEALTH_CALL" | "END_TELEHEALTH_CALL",
+  appointmentId: string,
+  description = "",
+) =>
+  request(`/api/v1/audit-logs/events/telehealth`, {
+    method: "POST",
+    body: JSON.stringify({ action_type: actionType, appointment_id: appointmentId, description }),
+  });
 
 /** Predictive care dashboard aggregate row */
 export type RiskBucketRow = { _id: string | null; count: number };
@@ -690,6 +809,10 @@ const api = {
   getPrescriptions,
   createPrescription,
   createPrescriptionInvoice,
+  getAuditLogs,
+  getAuditLog,
+  logout,
+  recordTelehealthAuditEvent,
   getPredictiveDashboard,
   getPredictiveAlerts,
   getPredictiveCareProfile,

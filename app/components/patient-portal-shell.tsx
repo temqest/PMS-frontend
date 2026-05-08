@@ -12,7 +12,8 @@ import {
   UserCircle2,
 } from "lucide-react";
 
-import { clearStoredSession, getPortalPathForRole, getSessionClaims } from "../../lib/session";
+import { clearStoredSession, getPortalPathForRole, getSessionClaims, getStoredUser, isPatientRole } from "../../lib/session";
+import api from "../../lib/api";
 import IncomingTelehealthCall from "./telehealth/IncomingTelehealthCall";
 
 const navItems = [
@@ -45,12 +46,13 @@ export default function PatientPortalShell({ children }: { children: ReactNode }
         return;
       }
 
-      if (claims.role !== "patient") {
+      if (!isPatientRole(claims.role)) {
         router.replace(getPortalPathForRole(claims.role));
         return;
       }
 
-      setDisplayName(claims.fullName || "Patient");
+      const storedUser = getStoredUser();
+      setDisplayName(claims.fullName || storedUser?.username || claims.username || "Patient");
       setReady(true);
     }, 0);
 
@@ -63,6 +65,7 @@ export default function PatientPortalShell({ children }: { children: ReactNode }
   }, [pathname]);
 
   const handleLogout = () => {
+    void api.logout().catch(() => undefined);
     clearStoredSession();
     router.replace("/login");
   };

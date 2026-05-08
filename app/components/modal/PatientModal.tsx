@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   User,
   Phone,
@@ -275,11 +276,16 @@ export default function PatientModal({
     return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
   };
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const fullName = form.firstName && form.lastName ? `${form.firstName} ${form.lastName}` : "New Patient";
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -706,6 +712,8 @@ export default function PatientModal({
           )}
         </div>
       </div>
-    </>
+
+    </>,
+    document.body
   );
 }

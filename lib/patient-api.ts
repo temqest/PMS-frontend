@@ -1,4 +1,5 @@
 import { clearStoredSession } from "./session";
+import { pushAuthDebug } from "./auth-debug";
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -32,11 +33,27 @@ async function request(path: string, opts: RequestInit = {}) {
   const isFormData = typeof FormData !== "undefined" && opts.body instanceof FormData;
   const headers: Record<string, string> = { Accept: "application/json", ...authHeader(), ...(opts.headers as Record<string, string> || {}) } as Record<string, string>;
   if (hasBody && !isFormData) headers["Content-Type"] = "application/json";
+  pushAuthDebug("patient_api.request", {
+    path,
+    method: opts.method || "GET",
+    hasAuthHeader: Boolean(headers.Authorization),
+  });
 
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   const body = await readBody(res);
   if (!res.ok) {
+    pushAuthDebug("patient_api.response_error", {
+      path,
+      method: opts.method || "GET",
+      status: res.status,
+      pathname: typeof window !== "undefined" ? window.location.pathname : "",
+    }, res.status === 401 ? "warn" : "error");
     if (res.status === 401) {
+      pushAuthDebug("patient_api.401_forcing_logout", {
+        path,
+        method: opts.method || "GET",
+        nextPath: typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "",
+      }, "warn");
       clearStoredSession();
       if (typeof window !== "undefined") {
         const next = `${window.location.pathname}${window.location.search}`;

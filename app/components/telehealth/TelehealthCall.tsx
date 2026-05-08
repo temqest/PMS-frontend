@@ -13,6 +13,7 @@ import {
   type TelehealthCallInvite,
 } from "../../../lib/telehealth";
 import { getPortalPathForRole, getSessionClaims } from "../../../lib/session";
+import api from "../../../lib/api";
 
 type TelehealthCallProps = {
   appointmentId: string;
@@ -28,7 +29,7 @@ type CallStatus =
   | "Peer disconnected"
   | "Call ended";
 
-const staffRoles = new Set(["system_admin", "front_desk", "physician", "appointment_system"]);
+const staffRoles = new Set(["Admin", "Doctor", "Staff", "Nurse"]);
 
 const getConnectionLabel = (state?: RTCPeerConnectionState) => {
   if (state === "connected") return "Connected";
@@ -61,6 +62,8 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const endedRef = useRef(false);
+  const startAuditLoggedRef = useRef(false);
+  const endAuditLoggedRef = useRef(false);
 
   const [status, setStatus] = useState<CallStatus>("Preparing secure room");
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>("new");
@@ -72,8 +75,22 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
   const [remoteVideoOrientation, setRemoteVideoOrientation] = useState<"unknown" | "portrait" | "landscape" | "square">("unknown");
   const [inviteStatus, setInviteStatus] = useState("Preparing call invite");
   const claims = getSessionClaims();
-  const exitHref = getPortalPathForRole(claims?.role);
-  const exitLabel = claims?.role === "patient" ? "Back to portal" : "Back to dashboard";
+  const exitHref = getPortalPathForRole(claims?.role, claims?.authType);
+  const exitLabel = claims?.authType === "patient" ? "Back to portal" : "Back to dashboard";
+
+  const recordCallAudit = useCallback((action: "START_TELEHEALTH_CALL" | "END_TELEHEALTH_CALL") => {
+    if (action === "START_TELEHEALTH_CALL") {
+      if (startAuditLoggedRef.current) return;
+      startAuditLoggedRef.current = true;
+    }
+
+    if (action === "END_TELEHEALTH_CALL") {
+      if (endAuditLoggedRef.current) return;
+      endAuditLoggedRef.current = true;
+    }
+
+    void api.recordTelehealthAuditEvent(action, appointmentId).catch(() => undefined);
+  }, [appointmentId]);
 
   const cleanupPeerConnection = useCallback(() => {
     peerConnectionRef.current?.close();
@@ -168,16 +185,20 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
   const handleEndCall = useCallback(() => {
     endedRef.current = true;
+    recordCallAudit("END_TELEHEALTH_CALL");
     socketRef.current?.emit("call:end", { appointmentId });
     cleanupCall();
     setInviteStatus("Call ended");
     setStatus("Call ended");
-  }, [appointmentId, cleanupCall]);
+  }, [appointmentId, cleanupCall, recordCallAudit]);
 
   const handleExitCall = useCallback(() => {
+    if (startAuditLoggedRef.current && !endAuditLoggedRef.current) {
+      recordCallAudit("END_TELEHEALTH_CALL");
+    }
     cleanupCall();
     router.push(exitHref);
-  }, [cleanupCall, exitHref, router]);
+  }, [cleanupCall, exitHref, recordCallAudit, router]);
 
   const toggleMic = useCallback(() => {
     const audioTracks = localStreamRef.current?.getAudioTracks() || [];
@@ -224,6 +245,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
         socket.on("connect", () => {
           console.info("[telehealth] call socket connected", { socketId: socket.id, appointmentId });
+          recordCallAudit("START_TELEHEALTH_CALL");
           if (shouldInitiateCall) {
             socket.emit("initiate-call", { appointmentId });
             setInviteStatus("Calling patient");
@@ -340,6 +362,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
         socket.on("call:ended", () => {
           endedRef.current = true;
+          recordCallAudit("END_TELEHEALTH_CALL");
           cleanupCall();
           setInviteStatus("Call ended");
           setStatus("Call ended");
@@ -347,6 +370,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
 
         socket.on("call-ended", () => {
           endedRef.current = true;
+          recordCallAudit("END_TELEHEALTH_CALL");
           cleanupCall();
           setInviteStatus("Call ended");
           setStatus("Call ended");
@@ -366,7 +390,7 @@ export default function TelehealthCall({ appointmentId }: TelehealthCallProps) {
       cancelled = true;
       cleanupCall();
     };
-  }, [appointmentId, cleanupCall, cleanupPeerConnection, createOffer, getPeerConnection]);
+  }, [appointmentId, cleanupCall, cleanupPeerConnection, createOffer, getPeerConnection, recordCallAudit]);
 
   useEffect(() => {
     const remoteVideo = remoteVideoRef.current;

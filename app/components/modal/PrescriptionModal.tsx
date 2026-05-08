@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Pill,
   X,
@@ -457,13 +458,18 @@ export default function PrescriptionModal({
         .slice(0, 8)
     : patients.slice(0, 8);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   // =============================================================================
   // RENDER
   // =============================================================================
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -1162,6 +1168,8 @@ export default function PrescriptionModal({
           )}
         </div>
       </div>
-    </>
+
+    </>,
+    document.body
   );
 }

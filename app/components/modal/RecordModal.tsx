@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   CheckCircle,
@@ -511,9 +512,14 @@ export default function RecordModal({
 
   const saveLabel = saveLabelForType(form.recordType);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
     <>
       <div className="record-modal-backdrop" onClick={handleBackdropClick} />
 
@@ -1679,6 +1685,8 @@ export default function RecordModal({
           </div>
         </div>
       ) : null}
-    </>
+
+    </>,
+    document.body
   );
 }

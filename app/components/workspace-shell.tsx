@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleHelp,
   ChartLine,
+  ClipboardList,
   FolderOpen,
   LayoutDashboard,
   LogOut,
@@ -20,6 +21,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { clearStoredSession, getSessionClaims } from "../../lib/session";
+import { hasPermission } from "../../lib/access-control";
+import api from "../../lib/api";
 import {
   createContext,
   useCallback,
@@ -66,25 +69,26 @@ export function useWorkspace() {
 }
 
 const baseNavigation = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/appointments", label: "Appointments", icon: CalendarDays },
-  { href: "/patients", label: "Patients", icon: Users },
-  { href: "/records", label: "Health Records", icon: FolderOpen },
-  { href: "/analytics", label: "Analytics", icon: ChartLine },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard:view" },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays, permission: "appointments:view" },
+  { href: "/patients", label: "Patients", icon: Users, permission: "patients:view" },
+  { href: "/records", label: "Health Records", icon: FolderOpen, permission: "health_records:view" },
+  { href: "/analytics", label: "Analytics", icon: ChartLine, permission: "dashboard:view" },
 ];
 
 const utilityNavigation = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-const adminNavItem = { href: "/admin", label: "Account Management", icon: ShieldCheck };
+const adminNavItem = { href: "/admin", label: "Account Management", icon: ShieldCheck, permission: "admin_users:view" };
+const auditNavItem = { href: "/audit-logs", label: "Audit Logs", icon: ClipboardList, permission: "audit_logs:view" };
 
 const shortcuts = [
-  { label: "Open patients", href: "/patients", hint: "Patient list" },
-  { label: "Today's schedule", href: "/appointments", hint: "Daily appointments" },
-  { label: "Health records", href: "/records", hint: "Timeline and notes" },
-  { label: "Analytics overview", href: "/analytics", hint: "Visit trends" },
-  { label: "New appointment", href: "/appointments", hint: "Create a visit" },
+  { label: "Open patients", href: "/patients", hint: "Patient list", permission: "patients:view" },
+  { label: "Today's schedule", href: "/appointments", hint: "Daily appointments", permission: "appointments:view" },
+  { label: "Health records", href: "/records", hint: "Timeline and notes", permission: "health_records:view" },
+  { label: "Analytics overview", href: "/analytics", hint: "Visit trends", permission: "dashboard:view" },
+  { label: "New appointment", href: "/appointments", hint: "Create a visit", permission: "appointments:view" },
 ];
 
 const notifications = [
@@ -113,6 +117,7 @@ const routeMeta: Record<string, { title: string }> = {
   "/analytics": { title: "Analytics" },
   "/settings": { title: "Settings" },
   "/admin": { title: "Account Management" },
+  "/audit-logs": { title: "Audit Logs" },
 };
 
 let toastId = 1;
@@ -131,9 +136,10 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
 
   const isStaff = useMemo(() => {
     const claims = getSessionClaims();
-    const staffRoles = ["system_admin", "front_desk"];
-    return Boolean(claims && staffRoles.includes(claims.role || ""));
+    return Boolean(claims && (hasPermission(claims, "admin_users:view") || hasPermission(claims, "audit_logs:view")));
   }, []);
+
+  const claims = useMemo(() => getSessionClaims(), []);
 
   const activeMeta = pathname.startsWith("/patients/")
     ? { title: "Patient Detail" }
@@ -142,11 +148,14 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const filteredShortcuts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
-      return shortcuts;
+      return shortcuts.filter((item) => hasPermission(claims, item.permission));
     }
 
-    return shortcuts.filter((item) => `${item.label} ${item.hint}`.toLowerCase().includes(normalized));
-  }, [query]);
+    return shortcuts.filter((item) => {
+      if (!hasPermission(claims, item.permission)) return false;
+      return `${item.label} ${item.hint}`.toLowerCase().includes(normalized);
+    });
+  }, [claims, query]);
 
   const pushToast = useCallback((toast: Omit<ToastItem, "id">) => {
     const id = toastId += 1;
@@ -205,12 +214,14 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   );
 
   const handleLogout = useCallback(() => {
+    void api.logout().catch(() => undefined);
     clearStoredSession();
     router.push("/");
   }, [router]);
 
-  const navigation = baseNavigation;
-  const sidebarUtilities = isStaff ? [...utilityNavigation, adminNavItem] : utilityNavigation;
+  const navigation = baseNavigation.filter((item) => hasPermission(claims, item.permission));
+  const sidebarUtilities = (isStaff ? [...utilityNavigation, adminNavItem, auditNavItem] : utilityNavigation)
+    .filter((item) => !("permission" in item) || hasPermission(claims, (item as any).permission));
 
   return (
     <WorkspaceContext.Provider value={contextValue}>
