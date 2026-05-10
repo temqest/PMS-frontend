@@ -18,6 +18,7 @@ import RecordModal, { type RecordForm } from "../../components/modal/RecordModal
 import {
   createAppointment,
   createHealthRecord,
+  createPatient,
   createPrescription,
   getAppointments,
   getHealthRecords,
@@ -325,7 +326,46 @@ export default function DashboardPage() {
         }}
         mode="create"
       />
-      <PatientModal isOpen={showPatient} onClose={() => setShowPatient(false)} onSubmit={(data)=>{ pushToast({type:'success', title: 'Patient added', message: `${data.firstName} ${data.lastName} created.`}); }} mode="create" />
+      <PatientModal
+        isOpen={showPatient}
+        onClose={() => setShowPatient(false)}
+        onSubmit={async (data) => {
+          await createPatient({
+            first_name: data.firstName || "",
+            last_name: data.lastName || "",
+            date_of_birth: data.dateOfBirth || "",
+            gender: data.sex || "",
+            contact_number: data.phone || "",
+            email_address: data.email || "",
+            address: data.street || "",
+            emergency_contact_name: data.emergencyContactName || "",
+            emergency_contact_relationship: data.emergencyContactRelationship || "",
+            emergency_contact_phone: data.emergencyContactPhone || "",
+            allergies: data.allergies || [],
+            medications: data.medications || [],
+            insurance: {
+              provider: data.insuranceProvider || "",
+              policy_number: data.policyNumber || "",
+              group_number: data.groupNumber || "",
+            },
+            lifestyle: {
+              smoking: !!data.lifestyleSmoking,
+              alcohol: !!data.lifestyleAlcohol,
+              diet: data.lifestyleDiet || "",
+              physical_activity: data.lifestylePhysicalActivity || "",
+            },
+            notes: data.notes || "",
+          });
+          await loadDashboardData();
+          setShowPatient(false);
+          pushToast({
+            type: "success",
+            title: "Patient added",
+            message: `${data.firstName} ${data.lastName} created.`,
+          });
+        }}
+        mode="create"
+      />
       <RecordModal
         isOpen={showRecord}
         onClose={() => setShowRecord(false)}
