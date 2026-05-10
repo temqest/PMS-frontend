@@ -47,6 +47,7 @@ export type RecordForm = {
   recordType: RecordType;
   date: string;
   provider: string;
+  providerId: string;
   visitReason: string;
   visitType: "Follow-up" | "Annual Physical" | "Urgent" | "Consultation" | "Procedure";
   chiefComplaint: string;
@@ -102,12 +103,7 @@ export type RecordForm = {
   previousNote: string;
 };
 
-const DEFAULT_PROVIDERS: ProviderOption[] = [
-  { id: "dr-sarah-johnson", name: "Dr. Sarah Johnson" },
-  { id: "dr-michael-chen", name: "Dr. Michael Chen" },
-  { id: "dr-patricia-williams", name: "Dr. Patricia Williams" },
-  { id: "dr-james-smith", name: "Dr. James Smith" },
-];
+const DEFAULT_PROVIDERS: ProviderOption[] = [];
 
 const DEFAULT_PATIENTS: PatientSummary[] = [
   { id: "pt-1001", name: "Mia Thompson" },
@@ -150,12 +146,16 @@ function createInitialForm(
   initialData?: Partial<RecordForm>,
   providers: ProviderOption[] = DEFAULT_PROVIDERS
 ): RecordForm {
-  const defaultProvider = providers[0]?.id || "";
+  const matchedInitialProvider = providers.find(
+    (provider) => provider.id === initialData?.providerId || provider.name === initialData?.provider
+  );
+  const defaultProvider = matchedInitialProvider || providers[0] || null;
   return {
     patient: initialData?.patient ?? preselectedPatient ?? null,
     recordType: initialData?.recordType ?? "Visit",
     date: initialData?.date ?? TODAY,
-    provider: initialData?.provider ?? defaultProvider,
+    provider: initialData?.provider ?? defaultProvider?.name ?? "",
+    providerId: initialData?.providerId ?? matchedInitialProvider?.id ?? defaultProvider?.id ?? "",
     visitReason: initialData?.visitReason ?? "",
     visitType: initialData?.visitType ?? "Follow-up",
     chiefComplaint: initialData?.chiefComplaint ?? "",
@@ -175,7 +175,7 @@ function createInitialForm(
     labReferenceRange: initialData?.labReferenceRange ?? "",
     labStatus: initialData?.labStatus ?? "Normal",
     labFlagForReview: initialData?.labFlagForReview ?? false,
-    labOrderingProvider: initialData?.labOrderingProvider ?? defaultProvider,
+    labOrderingProvider: initialData?.labOrderingProvider ?? defaultProvider?.name ?? "",
     labNotes: initialData?.labNotes ?? "",
     imagingStudyType: initialData?.imagingStudyType ?? "X-Ray",
     imagingBodyPart: initialData?.imagingBodyPart ?? "",
@@ -203,7 +203,7 @@ function createInitialForm(
     vaccinationSeriesComplete: initialData?.vaccinationSeriesComplete ?? false,
     vaccinationNextDoseDue: initialData?.vaccinationNextDoseDue ?? "",
     vaccinationVisGiven: initialData?.vaccinationVisGiven ?? false,
-    vaccinationAdministeredBy: initialData?.vaccinationAdministeredBy ?? defaultProvider,
+    vaccinationAdministeredBy: initialData?.vaccinationAdministeredBy ?? defaultProvider?.name ?? "",
     vaccinationNotes: initialData?.vaccinationNotes ?? "",
     noteType: initialData?.noteType ?? "Progress Note",
     noteContent: initialData?.noteContent ?? "",
@@ -244,6 +244,8 @@ export default function RecordModal({
   mode = "create",
   patients = DEFAULT_PATIENTS,
   providers = DEFAULT_PROVIDERS,
+  providersLoading = false,
+  providersError = "",
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -255,6 +257,8 @@ export default function RecordModal({
   mode?: "create" | "edit";
   patients?: PatientSummary[];
   providers?: ProviderOption[];
+  providersLoading?: boolean;
+  providersError?: string;
 }) {
   const [form, setForm] = useState<RecordForm>(() => createInitialForm(preselectedPatient, initialData, providers));
   const [initialSnapshot, setInitialSnapshot] = useState<RecordForm>(() => createInitialForm(preselectedPatient, initialData, providers));
@@ -507,6 +511,10 @@ export default function RecordModal({
   };
 
   const showFieldError = (fieldName: string) => Boolean(errors[fieldName]);
+  const providerSelectValue =
+    providers.find((provider) => provider.name === form.provider)?.name || form.provider;
+  const showLegacyProviderOption =
+    Boolean(form.provider) && !providers.some((provider) => provider.name === form.provider);
 
   const recordTypeOptions: RecordType[] = ["Visit", "Lab Result", "Imaging", "Prescription", "Vaccination", "Note"];
 
@@ -694,9 +702,18 @@ export default function RecordModal({
                       <User size={16} strokeWidth={1.5} className="record-input-icon-left record-input-icon-left-select" />
                       <select
                         className={`record-select ${showFieldError("provider") ? "record-input-error" : ""}`}
-                        value={form.provider}
+                        value={providerSelectValue}
+                        disabled={providersLoading || (!providers.length && !form.provider)}
                         onChange={(event) => {
-                          setForm((previous) => ({ ...previous, provider: event.target.value, labOrderingProvider: event.target.value, vaccinationAdministeredBy: event.target.value }));
+                          const selectedProvider = providers.find((provider) => provider.name === event.target.value) || null;
+                          const providerName = selectedProvider?.name || event.target.value;
+                          setForm((previous) => ({
+                            ...previous,
+                            provider: providerName,
+                            providerId: selectedProvider?.id || "",
+                            labOrderingProvider: providerName,
+                            vaccinationAdministeredBy: providerName,
+                          }));
                           setErrors((previous) => ({ ...previous, provider: "" }));
                           markDirty();
                         }}
@@ -704,14 +721,18 @@ export default function RecordModal({
                           if (!form.provider) setErrors((previous) => ({ ...previous, provider: "Provider is required" }));
                         }}
                       >
+                        {providersLoading ? <option value="">Loading providers...</option> : null}
+                        {!providersLoading && !providers.length && !form.provider ? <option value="">No providers available</option> : null}
+                        {showLegacyProviderOption ? <option value={form.provider}>{form.provider}</option> : null}
                         {providers.map((provider) => (
-                          <option key={provider.id} value={provider.id}>
+                          <option key={provider.id} value={provider.name}>
                             {provider.name}
                           </option>
                         ))}
                       </select>
                       <ChevronDown size={12} strokeWidth={1.5} className="record-select-caret" />
                     </div>
+                    {providersError ? <p className="mt-2 text-xs text-amber-700">{providersError}</p> : null}
                     {showFieldError("provider") ? (
                       <div className="record-error-message">
                         <AlertCircle size={14} strokeWidth={1.5} />
@@ -1032,7 +1053,7 @@ export default function RecordModal({
                             }}
                           >
                             {providers.map((provider) => (
-                              <option key={provider.id} value={provider.id}>
+                              <option key={provider.id} value={provider.name}>
                                 {provider.name}
                               </option>
                             ))}
@@ -1183,7 +1204,7 @@ export default function RecordModal({
                           >
                             <option value="">Same as ordering provider</option>
                             {providers.map((provider) => (
-                              <option key={provider.id} value={provider.id}>
+                              <option key={provider.id} value={provider.name}>
                                 {provider.name}
                               </option>
                             ))}
@@ -1514,7 +1535,7 @@ export default function RecordModal({
                         <div className="record-select-with-icon">
                           <select className="record-select" value={form.vaccinationAdministeredBy} onChange={(event) => { setForm((previous) => ({ ...previous, vaccinationAdministeredBy: event.target.value })); markDirty(); }}>
                             {providers.map((provider) => (
-                              <option key={provider.id} value={provider.id}>
+                              <option key={provider.id} value={provider.name}>
                                 {provider.name}
                               </option>
                             ))}

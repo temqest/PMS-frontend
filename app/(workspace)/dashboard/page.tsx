@@ -21,10 +21,12 @@ import {
   createPrescription,
   getAppointments,
   getHealthRecords,
+  getHealthRecordProviders,
   getPatients,
   mapAppointmentToUi,
   mapHealthRecordToUi,
   type PatientOption,
+  type ProviderOption,
   type UiAppointment,
   type UiHealthRecord,
 } from "../../../lib/api";
@@ -97,6 +99,10 @@ export default function DashboardPage() {
   const [patients, setPatients] = useState<PatientOption[]>([]);
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState("");
+  const [currentProviderName, setCurrentProviderName] = useState("");
 
   const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] => {
     if (Array.isArray(resp)) return resp as Record<string, unknown>[];
@@ -108,11 +114,14 @@ export default function DashboardPage() {
   };
 
   const loadDashboardData = useCallback(async () => {
+    setProvidersLoading(true);
+    setProvidersError("");
     try {
-      const [patientResp, appointmentResp, recordResp] = await Promise.all([
+      const [patientResp, appointmentResp, recordResp, providerResp] = await Promise.all([
         getPatients("?limit=200"),
         getAppointments({ limit: 200 }),
         getHealthRecords({ limit: 200 }),
+        getHealthRecordProviders(),
       ]);
 
       const patientRows = extractRows(patientResp as unknown, ["patients", "results"]);
@@ -133,10 +142,18 @@ export default function DashboardPage() {
 
       const recordRows = extractRows(recordResp as unknown, ["records", "results"]);
       setRecords(Array.isArray(recordRows) ? recordRows.map(mapHealthRecordToUi) : []);
+      setProviders(Array.isArray(providerResp.providers) ? providerResp.providers : []);
+      setCurrentProviderName(providerResp.current_provider?.name || "");
+      setProvidersError(providerResp.warning || "");
     } catch {
       setPatients([]);
       setAppointments([]);
       setRecords([]);
+      setProviders([]);
+      setCurrentProviderName("");
+      setProvidersError("Unable to load provider options right now.");
+    } finally {
+      setProvidersLoading(false);
     }
   }, []);
 
@@ -313,6 +330,9 @@ export default function DashboardPage() {
         isOpen={showRecord}
         onClose={() => setShowRecord(false)}
         patients={patients}
+        providers={providers}
+        providersLoading={providersLoading}
+        providersError={providersError}
         onSubmit={async (record) => {
           await createHealthRecord({
             patient_id: record.patient?.id || "",
@@ -320,6 +340,7 @@ export default function DashboardPage() {
             record_type: record.recordType,
             record_date: record.date,
             provider: record.provider,
+            provider_id: record.providerId || undefined,
             save_state: record.saveState,
             summary: recordSummary(record),
             details: {
@@ -345,7 +366,7 @@ export default function DashboardPage() {
           await createPrescription({
             patient_id: data.patient?.id || "",
             patient_name: data.patient?.name || "",
-            provider: "Assigned Provider",
+            provider: currentProviderName || "Prescribing clinician",
             record_date: data.startDate || new Date().toISOString().slice(0, 10),
             medicines: data.medicines,
             directions_for_use: data.directionsForUse || "",

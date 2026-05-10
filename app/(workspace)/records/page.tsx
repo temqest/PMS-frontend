@@ -14,10 +14,12 @@ import {
   createPrescriptionInvoice,
   deleteHealthRecord,
   getHealthRecords,
+  getHealthRecordProviders,
   getPatients,
   mapHealthRecordToUi,
   updateHealthRecord,
   type HealthRecordPayload,
+  type ProviderOption,
   type UiHealthRecord,
 } from "../../../lib/api";
 
@@ -66,6 +68,7 @@ const toPayload = (data: RecordForm & { saveState: "draft" | "final" }): HealthR
   record_type: data.recordType,
   record_date: data.date,
   provider: data.provider,
+  provider_id: data.providerId || undefined,
   save_state: data.saveState,
   summary:
     data.recordType === "Visit"
@@ -102,7 +105,9 @@ export default function RecordsPage() {
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientSummary | null>(null);
-  const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
@@ -170,8 +175,13 @@ export default function RecordsPage() {
   };
 
   const loadLookupData = async () => {
+    setProvidersLoading(true);
+    setProvidersError("");
     try {
-      const patientResp = (await getPatients("?limit=200")) as unknown;
+      const [patientResp, providerResp] = await Promise.all([
+        getPatients("?limit=200"),
+        getHealthRecordProviders(),
+      ]);
       const patientRows = extractRows(patientResp, ["patients", "results"]);
       const patientOptions: PatientSummary[] = Array.isArray(patientRows)
         ? patientRows
@@ -182,14 +192,14 @@ export default function RecordsPage() {
             .filter((item: PatientSummary) => item.id && item.name)
         : [];
       setPatients(patientOptions);
-      setProviders(
-        patientOptions.length
-          ? [{ id: "assigned-provider", name: "Assigned Provider" }, { id: "lab-services", name: "Lab Services" }]
-          : [{ id: "assigned-provider", name: "Assigned Provider" }]
-      );
+      setProviders(Array.isArray(providerResp.providers) ? providerResp.providers : []);
+      setProvidersError(providerResp.warning || "");
     } catch {
       setPatients([]);
-      setProviders([{ id: "assigned-provider", name: "Assigned Provider" }]);
+      setProviders([]);
+      setProvidersError("Unable to load provider options right now.");
+    } finally {
+      setProvidersLoading(false);
     }
   };
 
@@ -213,6 +223,7 @@ export default function RecordsPage() {
         return parsed.toISOString().slice(0, 10);
       })(),
       provider: record.provider,
+      providerId: record.providerId,
     };
   };
 
@@ -489,6 +500,8 @@ export default function RecordsPage() {
       patientLocked={!!selectedPatient}
       patients={patients}
       providers={providers}
+      providersLoading={providersLoading}
+      providersError={providersError}
     />
     <PrescriptionInvoiceModal
       isOpen={showInvoiceModal}

@@ -197,6 +197,7 @@ export type HealthRecordPayload = {
   record_type: HealthRecordType;
   record_date: string;
   provider: string;
+  provider_id?: string;
   save_state?: HealthRecordSaveState;
   summary?: string;
   details?: Record<string, unknown>;
@@ -217,6 +218,7 @@ export type UiHealthRecord = {
   date: string;
   dateIso: string;
   provider: string;
+  providerId?: string;
   summary: string;
   recordType: HealthRecordType;
   saveState: HealthRecordSaveState;
@@ -229,6 +231,7 @@ export type PrescriptionPayload = {
   patient_id: string;
   patient_name: string;
   provider: string;
+  provider_id?: string;
   record_date: string;
   save_state?: HealthRecordSaveState;
   medicines: PrescriptionMedicineLineItem[];
@@ -268,10 +271,25 @@ export type PrescriptionInvoicePayload = {
   status?: 'pending' | 'paid' | 'cancelled';
 };
 
+export type PrescriptionInvoiceStatus = "pending" | "paid" | "cancelled";
+
+export type PrescriptionInvoice = {
+  invoice_id: string;
+  patient_id: string;
+  patient_name: string;
+  health_record_id?: string;
+  prescription_names?: string[];
+  invoice_date?: string;
+  status?: PrescriptionInvoiceStatus;
+  is_released?: boolean;
+  total_amount?: number;
+};
+
 export type UiPrescription = {
   id: string;
   patient: PatientOption;
   provider: string;
+  providerId?: string;
   dateIso: string;
   medicationName: string;
   dosage: string;
@@ -283,6 +301,10 @@ export type UiPrescription = {
   startDate: string;
   endDate: string;
   saveState: HealthRecordSaveState;
+  paymentStatus: PrescriptionInvoiceStatus | "unknown";
+  releaseStatus: "released" | "pending_release" | "unknown";
+  issuedDate: string;
+  invoiceId: string;
 };
 
 export type UiAppointment = {
@@ -309,6 +331,12 @@ export type UiAppointment = {
 };
 
 export type PatientOption = { id: string; name: string };
+export type ProviderOption = { id: string; name: string; full_name?: string; role?: string; title?: string };
+export type ProviderDirectoryResponse = {
+  providers?: ProviderOption[];
+  current_provider?: ProviderOption | null;
+  warning?: string;
+};
 
 export type PrescriptionMedicine = {
   id: string;
@@ -433,6 +461,7 @@ export const mapHealthRecordToUi = (item: Record<string, unknown>): UiHealthReco
     record_type?: HealthRecordType;
     record_date?: string;
     provider?: string;
+    provider_id?: string;
     save_state?: HealthRecordSaveState;
     summary?: string;
     condition_category?: ConditionCategory;
@@ -450,6 +479,7 @@ export const mapHealthRecordToUi = (item: Record<string, unknown>): UiHealthReco
     date: toUiRecordDate(source.record_date),
     dateIso: source.record_date || "",
     provider: source.provider || "",
+    providerId: source.provider_id || "",
     summary: source.summary || summaryFromDetails || "",
     recordType,
     saveState: source.save_state || "final",
@@ -469,6 +499,7 @@ export const mapHealthRecordToUiPrescription = (item: Record<string, unknown>): 
     patient_id?: string;
     patient_name?: string;
     provider?: string;
+    provider_id?: string;
     save_state?: HealthRecordSaveState;
     record_date?: string;
     details?: Record<string, unknown>;
@@ -485,6 +516,7 @@ export const mapHealthRecordToUiPrescription = (item: Record<string, unknown>): 
       name: source.patient_name || "",
     },
     provider: source.provider || "",
+    providerId: source.provider_id || "",
     dateIso: source.record_date || "",
     medicationName:
       typeof details.medicationName === "string"
@@ -503,6 +535,10 @@ export const mapHealthRecordToUiPrescription = (item: Record<string, unknown>): 
     startDate: typeof details.startDate === "string" ? details.startDate : "",
     endDate: typeof details.endDate === "string" ? details.endDate : "",
     saveState: source.save_state || "final",
+    paymentStatus: "unknown",
+    releaseStatus: "unknown",
+    issuedDate: source.record_date || "",
+    invoiceId: "",
   };
 };
 
@@ -512,6 +548,7 @@ const toPrescriptionHealthRecordPayload = (payload: PrescriptionPayload): Health
   record_type: "Prescription",
   record_date: payload.record_date,
   provider: payload.provider,
+  provider_id: payload.provider_id,
   save_state: payload.save_state || "final",
   summary: payload.directions_for_use || "",
   details: {
@@ -561,6 +598,8 @@ export const cancelAppointment = (id: string, reason = "") => request(`/api/v1/a
 export const getHealthRecords = (params?: Record<string, string | number | undefined>) =>
   request(`/api/v1/health-records${makeQuery(params)}`);
 export const getHealthRecordById = (id: string) => request(`/api/v1/health-records/${id}`);
+export const getHealthRecordProviders = () =>
+  request(`/api/v1/health-records/providers`) as Promise<ProviderDirectoryResponse>;
 export const createHealthRecord = (payload: HealthRecordPayload) =>
   request(`/api/v1/health-records`, { method: "POST", body: JSON.stringify(payload) });
 export const updateHealthRecord = (id: string, payload: Partial<HealthRecordPayload>) =>
@@ -580,6 +619,17 @@ export const getPrescriptions = (params?: Record<string, string | number | undef
   request(
     `/api/v1/health-records${makeQuery({ ...params, record_type: "Prescription" })}`
   );
+export const getPrescriptionInvoices = async (
+  params?: Record<string, string | number | undefined>
+): Promise<PrescriptionInvoice[]> => {
+  const result = await request(`/api/v1/prescription-invoices${makeQuery(params)}`) as
+    | PrescriptionInvoice[]
+    | { invoices?: PrescriptionInvoice[]; data?: PrescriptionInvoice[] };
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result?.invoices)) return result.invoices;
+  if (Array.isArray(result?.data)) return result.data;
+  return [];
+};
 export const createPrescription = (payload: PrescriptionPayload) =>
   createHealthRecord(toPrescriptionHealthRecordPayload(payload));
 export const createPrescriptionInvoice = (payload: PrescriptionInvoicePayload) =>
@@ -802,11 +852,13 @@ const api = {
   cancelAppointment,
   getHealthRecords,
   getHealthRecordById,
+  getHealthRecordProviders,
   createHealthRecord,
   updateHealthRecord,
   deleteHealthRecord,
   getPrescriptionMedicines,
   getPrescriptions,
+  getPrescriptionInvoices,
   createPrescription,
   createPrescriptionInvoice,
   getAuditLogs,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Activity, CalendarDays, Eye, FileSearch, Search, ShieldCheck, X } from "lucide-react";
 
 import api, { type AuditLogItem } from "../../../lib/api";
@@ -100,6 +101,7 @@ export default function AuditLogsPage() {
   const [appliedFilters, setAppliedFilters] = useState<Filters>(initialFilters);
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -148,6 +150,10 @@ export default function AuditLogsPage() {
       cancelled = true;
     };
   }, [pushToast, queryParams]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const applyFilters = () => {
     setPage(1);
@@ -297,7 +303,7 @@ export default function AuditLogsPage() {
         </div>
       </div>
 
-      {selectedLog ? (
+      {selectedLog && mounted ? createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-sm">
           <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-[16px] bg-white shadow-[0_20px_40px_rgba(0,0,0,0.08)]">
             <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-5">
@@ -336,7 +342,7 @@ export default function AuditLogsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+      , document.body) : null}
     </div>
   );
 }

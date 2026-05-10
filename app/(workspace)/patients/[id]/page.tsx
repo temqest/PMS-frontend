@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, MoreVertical, Pencil, Plus } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, MoreVertical, Pencil, Plus, X, XCircle } from "lucide-react";
 
 import { useWorkspace } from "../../../components/workspace-shell";
 import { AvatarInitials, Badge, QuickLine, SectionHeader, WorkspaceCard } from "../../../components/workspace-ui";
@@ -20,6 +21,8 @@ import type {
   PredictiveCareProfile,
   PredictiveCareRadarPayload,
   PredictiveCareTimelineEvent,
+  PrescriptionInvoice,
+  ProviderOption,
   UiAppointment,
   UiHealthRecord,
   UiPrescription,
@@ -82,6 +85,134 @@ const extractRows = (resp: unknown, keys: string[]): Record<string, unknown>[] =
 
 const patientTabs = ["Overview", "Predictive Care", "Health Records", "Appointments", "Prescriptions"] as const;
 type PatientTab = (typeof patientTabs)[number];
+type DetailModalState =
+  | { kind: "appointment"; item: UiAppointment }
+  | { kind: "record"; item: UiHealthRecord }
+  | { kind: "prescription"; item: UiPrescription };
+
+const formatDetailLabel = (key: string) =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const formatDetailValue = (value: unknown): string => {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return `${value}`;
+  if (typeof value === "string") return value.trim() || "-";
+  if (Array.isArray(value)) {
+    const rendered = value
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          return Object.values(item as Record<string, unknown>)
+            .map((part) => (typeof part === "string" || typeof part === "number" ? String(part) : ""))
+            .filter(Boolean)
+            .join(" • ");
+        }
+        return String(item || "");
+      })
+      .filter(Boolean)
+      .join(", ");
+    return rendered || "-";
+  }
+  if (value && typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "-";
+    }
+  }
+  return "-";
+};
+
+const getRecordDetailEntries = (details: Record<string, unknown>) =>
+  Object.entries(details || {}).filter(([key, value]) => {
+    if (["title", "summary", "patient", "provider", "providerId", "recordType", "date", "saveState"].includes(key)) {
+      return false;
+    }
+    if (value === null || typeof value === "undefined") return false;
+    if (typeof value === "string" && !value.trim()) return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    return true;
+  });
+
+const formatPrescriptionIssuedDate = (value?: string) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const paymentStatusMeta = (status: UiPrescription["paymentStatus"]) => {
+  if (status === "paid") {
+    return { label: "Paid", tone: "green" as const, icon: CheckCircle2 };
+  }
+  if (status === "cancelled") {
+    return { label: "Cancelled", tone: "red" as const, icon: XCircle };
+  }
+  return { label: "Unpaid", tone: "amber" as const, icon: Clock3 };
+};
+
+const releaseStatusMeta = (status: UiPrescription["releaseStatus"]) => {
+  if (status === "released") {
+    return { label: "Released", tone: "green" as const, icon: CheckCircle2 };
+  }
+  return { label: "Pending Release", tone: "amber" as const, icon: Clock3 };
+};
+
+function StatusBadge({
+  meta,
+}: {
+  meta: { label: string; tone: "neutral" | "sage" | "blue" | "amber" | "red" | "green"; icon: typeof Clock3 };
+}) {
+  const Icon = meta.icon;
+  return (
+    <Badge tone={meta.tone}>
+      <span className="inline-flex items-center gap-1">
+        <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+        {meta.label}
+      </span>
+    </Badge>
+  );
+}
+
+const mergePrescriptionStatuses = (
+  prescriptions: UiPrescription[],
+  invoices: PrescriptionInvoice[]
+): UiPrescription[] => {
+  const invoiceByRecordId = new Map<string, PrescriptionInvoice>();
+  for (const invoice of invoices) {
+    const healthRecordId = String(invoice.health_record_id || "").trim();
+    if (healthRecordId) {
+      invoiceByRecordId.set(healthRecordId, invoice);
+    }
+  }
+
+  return prescriptions.map((rx) => {
+    const invoice = invoiceByRecordId.get(rx.id);
+
+    let paymentStatus: UiPrescription["paymentStatus"] = "unknown";
+    if (invoice?.status === "paid" || invoice?.status === "pending" || invoice?.status === "cancelled") {
+      paymentStatus = invoice.status;
+    }
+
+    let releaseStatus: UiPrescription["releaseStatus"] = "unknown";
+    if (typeof invoice?.is_released === "boolean") {
+      releaseStatus = invoice.is_released ? "released" : "pending_release";
+    }
+
+    return {
+      ...rx,
+      paymentStatus,
+      releaseStatus,
+      issuedDate: invoice?.invoice_date || rx.dateIso || "",
+      invoiceId: invoice?.invoice_id || "",
+    };
+  });
+};
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { pushToast, requestConfirm } = useWorkspace();
@@ -91,6 +222,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [appointments, setAppointments] = useState<UiAppointment[]>([]);
   const [records, setRecords] = useState<UiHealthRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<UiPrescription[]>([]);
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState("");
+  const [currentProviderName, setCurrentProviderName] = useState("");
   const [predictiveProfile, setPredictiveProfile] = useState<PredictiveCareProfile | null>(null);
   const [labTrends, setLabTrends] = useState<PredictiveCareLabTrend[]>([]);
   const [labForecast, setLabForecast] = useState<PredictiveCareLabForecast | null>(null);
@@ -112,17 +247,27 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
   const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
+  const [detailModal, setDetailModal] = useState<DetailModalState | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadPatientData = useCallback(async () => {
     try {
       setLoading(true);
       setLoadError(null);
+      setProvidersLoading(true);
+      setProvidersError("");
       const id = patientId;
-      const [patientResp, appointmentResp, recordResp, prescriptionResp] = await Promise.all([
+      const [patientResp, appointmentResp, recordResp, prescriptionResp, invoiceResp, providerResp] = await Promise.all([
         api.getPatient(id),
         api.getAppointments({ patient_id: id, limit: 200 }),
         api.getHealthRecords({ patient_id: id, limit: 200 }),
         api.getPrescriptions({ patient_id: id, limit: 200 }),
+        api.getPrescriptionInvoices({ patient_id: id, limit: 200 }),
+        api.getHealthRecordProviders(),
       ]);
 
       const patientRaw = patientResp as unknown;
@@ -140,16 +285,23 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       setRecords(mappedRecords.filter((item) => item.recordType !== "Prescription"));
 
       const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
-      setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
+      const mappedPrescriptions = rxRows.map(api.mapHealthRecordToUiPrescription);
+      setPrescriptions(mergePrescriptionStatuses(mappedPrescriptions, invoiceResp));
+      setProviders(Array.isArray(providerResp.providers) ? providerResp.providers : []);
+      setCurrentProviderName(providerResp.current_provider?.name || "");
+      setProvidersError(providerResp.warning || "");
     } catch (error) {
       const apiError = error as { status?: number; message?: string };
       setPatient(null);
       setAppointments([]);
       setRecords([]);
       setPrescriptions([]);
+      setProviders([]);
+      setCurrentProviderName("");
       setLoadError(apiError.status === 404 ? null : apiError.message || "Unable to load patient profile.");
     } finally {
       setLoading(false);
+      setProvidersLoading(false);
     }
   }, [patientId]);
 
@@ -372,7 +524,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       {tab === "Overview" ? (
           <div className={`${tabPanelShellClassName} grid gap-6 lg:grid-cols-[2fr_1fr]`}>
           <div className="space-y-6">
-          <WorkspaceCard className="h-full p-6">
+          <WorkspaceCard className="self-start p-6">
               <SectionHeader title="Personal Info" action={<button className="text-sm text-[var(--accent-sage)] hover:underline">Edit</button>} />
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <QuickLine label="Date of Birth" value={display.date_of_birth ? new Date(display.date_of_birth).toLocaleDateString() : "-"} />
@@ -406,7 +558,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                         <td className="px-4 py-4" colSpan={4}>No recent records.</td>
                       </tr>
                     ) : overviewRecords.map((visit) => (
-                      <tr key={visit.id} className="border-t border-[#F3F4F6] text-sm text-slate-600">
+                      <tr
+                        key={visit.id}
+                        className="cursor-pointer border-t border-[#F3F4F6] text-sm text-slate-600 transition-colors hover:bg-[#FAFBFC]"
+                        onClick={() => setDetailModal({ kind: "record", item: visit })}
+                      >
                         <td className="px-4 py-4">{visit.date || "-"}</td>
                         <td className="px-4 py-4"><Badge tone="blue">{visit.recordType}</Badge></td>
                         <td className="px-4 py-4">{visit.provider || "-"}</td>
@@ -535,7 +691,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                       <td className="px-4 py-4" colSpan={5}>No appointments found.</td>
                     </tr>
                   ) : appointments.map((item) => (
-                    <tr key={item.id} className="border-t border-[#F3F4F6] text-sm text-slate-600">
+                    <tr
+                      key={item.id}
+                      className="cursor-pointer border-t border-[#F3F4F6] text-sm text-slate-600 transition-colors hover:bg-[#FAFBFC]"
+                      onClick={() => setDetailModal({ kind: "appointment", item })}
+                    >
                       <td className="px-4 py-4">{item.date}</td>
                       <td className="px-4 py-4">{item.time}</td>
                       <td className="px-4 py-4">{item.type}</td>
@@ -553,7 +713,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   No health records found.
                 </div>
               ) : records.map((record) => (
-                <div key={record.id} className="rounded-[12px] border border-[#F3F4F6] p-4">
+                <button
+                  key={record.id}
+                  type="button"
+                  onClick={() => setDetailModal({ kind: "record", item: record })}
+                  className="relative w-full rounded-[12px] border border-[#F3F4F6] p-4 text-left transition-colors hover:bg-[#FAFBFC] lg:pr-72"
+                >
                   <div className="flex items-center gap-2">
                     <Badge tone="blue">{record.recordType}</Badge>
                     <Badge tone="neutral">{record.conditionCategory}</Badge>
@@ -561,7 +726,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                   <p className="mt-2 font-medium text-slate-900">{record.title}</p>
                   <p className="mt-1 text-sm text-slate-600">{record.summary || "-"}</p>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -571,15 +736,25 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   No prescriptions found.
                 </div>
               ) : prescriptions.map((rx) => (
-                <div key={rx.id} className="rounded-[12px] border border-[#F3F4F6] p-4">
+                <button
+                  key={rx.id}
+                  type="button"
+                  onClick={() => setDetailModal({ kind: "prescription", item: rx })}
+                  className="w-full rounded-[12px] border border-[#F3F4F6] p-4 text-left transition-colors hover:bg-[#FAFBFC]"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium text-slate-900">{rx.medicationName || "Prescription"}</p>
                     <Badge tone="neutral">{rx.form || "-"}</Badge>
                   </div>
+                  <p className="mt-2 text-xs text-slate-500">Issued: {formatPrescriptionIssuedDate(rx.issuedDate)}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 sm:justify-end lg:float-right lg:ml-6 lg:max-w-[18rem]">
+                    <StatusBadge meta={paymentStatusMeta(rx.paymentStatus)} />
+                    <StatusBadge meta={releaseStatusMeta(rx.releaseStatus)} />
+                  </div>
                   <p className="mt-1 text-sm text-slate-600">{rx.dosage || "-"} • {rx.directionsForUse || "-"}</p>
                   <p className="mt-1 text-xs text-slate-500">Start: {rx.startDate || "-"} • End: {rx.endDate || "-"}</p>
                   <p className="mt-1 text-xs text-slate-500">Qty: {rx.quantity} • Refills: {rx.refills}</p>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -624,6 +799,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         onClose={() => setIsRecordModalOpen(false)}
         preselectedPatient={{ id: patientId, name: fullName }}
         patientLocked
+        providers={providers}
+        providersLoading={providersLoading}
+        providersError={providersError}
         onSubmit={async (record) => {
           try {
             const payload = {
@@ -632,6 +810,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               record_type: record.recordType,
               record_date: record.date,
               provider: record.provider,
+              provider_id: record.providerId || undefined,
               summary: recordSummary(record),
               details: {
                 title: recordTitle(record),
@@ -662,7 +841,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             const payload = {
               patient_id: patientId,
               patient_name: fullName,
-              provider: "Assigned Provider",
+              provider: currentProviderName || "Prescribing clinician",
               record_date: prescription.startDate,
               medicines: prescription.medicines,
               directions_for_use: prescription.directionsForUse,
@@ -673,14 +852,157 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             pushToast({ type: "success", title: "Prescription created", message: `Prescription added for ${fullName}.` });
             setIsPrescriptionModalOpen(false);
             // Refresh prescriptions
-            const prescriptionResp = await api.getPrescriptions({ patient_id: patientId, limit: 200 });
+            const [prescriptionResp, invoiceResp] = await Promise.all([
+              api.getPrescriptions({ patient_id: patientId, limit: 200 }),
+              api.getPrescriptionInvoices({ patient_id: patientId, limit: 200 }),
+            ]);
             const rxRows = extractRows(prescriptionResp as unknown, ["records", "results"]);
-            setPrescriptions(rxRows.map(api.mapHealthRecordToUiPrescription));
+            const mappedPrescriptions = rxRows.map(api.mapHealthRecordToUiPrescription);
+            setPrescriptions(mergePrescriptionStatuses(mappedPrescriptions, invoiceResp));
           } catch {
             pushToast({ type: "error", title: "Failed to create prescription", message: "Please try again." });
           }
         }}
       />
+      {detailModal && mounted ? createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 py-6" onClick={() => setDetailModal(null)}>
+          <div
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[18px] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-[#E5E7EB] bg-white px-6 py-5">
+              <div>
+                <p className="text-sm text-slate-500">
+                  {detailModal.kind === "appointment"
+                    ? "Appointment Details"
+                    : detailModal.kind === "record"
+                      ? "Health Record Details"
+                      : "Prescription Details"}
+                </p>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                  {detailModal.kind === "appointment"
+                    ? detailModal.item.reason || `${detailModal.item.type} appointment`
+                    : detailModal.kind === "record"
+                      ? detailModal.item.title || detailModal.item.recordType
+                      : detailModal.item.medicationName || "Prescription"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModal(null)}
+                className="rounded-[10px] border border-[#E5E7EB] p-2 text-slate-500 hover:bg-[#F8FAFC]"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </div>
+
+            <div className="space-y-6 px-6 py-6">
+              {detailModal.kind === "appointment" ? (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <QuickLine label="Date" value={detailModal.item.date || "-"} />
+                    <QuickLine label="Time" value={detailModal.item.time || "-"} />
+                    <QuickLine label="Type" value={detailModal.item.type || "-"} />
+                    <QuickLine label="Status" value={detailModal.item.status || "-"} />
+                    <QuickLine label="Priority" value={detailModal.item.priority || "-"} />
+                    <QuickLine label="Duration" value={detailModal.item.duration || "-"} />
+                    <QuickLine label="Email Reminder" value={detailModal.item.sendEmailReminder ? "Enabled" : "Disabled"} />
+                    <QuickLine label="SMS Reminder" value={detailModal.item.sendSmsReminder ? "Enabled" : "Disabled"} />
+                  </div>
+                  <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                    <p className="text-sm font-medium text-slate-900">Reason</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{detailModal.item.reason || "No reason provided."}</p>
+                  </div>
+                  {detailModal.item.internalNotes ? (
+                    <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                      <p className="text-sm font-medium text-slate-900">Internal Notes</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{detailModal.item.internalNotes}</p>
+                    </div>
+                  ) : null}
+                  {detailModal.item.cancelReason ? (
+                    <div className="rounded-[12px] border border-[#FDE68A] bg-[#FFFBEB] p-4">
+                      <p className="text-sm font-medium text-[#92400E]">Cancellation Reason</p>
+                      <p className="mt-2 text-sm leading-6 text-[#92400E]">{detailModal.item.cancelReason}</p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {detailModal.kind === "record" ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="blue">{detailModal.item.recordType}</Badge>
+                    <Badge tone="neutral">{detailModal.item.conditionCategory}</Badge>
+                    <Badge tone={detailModal.item.saveState === "draft" ? "amber" : "green"}>
+                      {detailModal.item.saveState === "draft" ? "Draft" : "Final"}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <QuickLine label="Date" value={detailModal.item.date || "-"} />
+                    <QuickLine label="Provider" value={detailModal.item.provider || "-"} />
+                  </div>
+                  <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                    <p className="text-sm font-medium text-slate-900">Summary</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{detailModal.item.summary || "No summary available."}</p>
+                  </div>
+                  {getRecordDetailEntries(detailModal.item.details).length > 0 ? (
+                    <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                      <p className="text-sm font-medium text-slate-900">Structured Details</p>
+                      <div className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
+                        {getRecordDetailEntries(detailModal.item.details).map(([key, value]) => (
+                          <div key={key} className="border-b border-[#F1F5F9] pb-3 last:border-b-0">
+                            <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDetailLabel(key)}</p>
+                            <p className="mt-1 text-sm leading-6 text-slate-700">{formatDetailValue(value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {detailModal.kind === "prescription" ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge meta={paymentStatusMeta(detailModal.item.paymentStatus)} />
+                    <StatusBadge meta={releaseStatusMeta(detailModal.item.releaseStatus)} />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <QuickLine label="Provider" value={detailModal.item.provider || "-"} />
+                    <QuickLine label="Date Issued" value={formatPrescriptionIssuedDate(detailModal.item.issuedDate)} />
+                    <QuickLine label="Dosage" value={detailModal.item.dosage || "-"} />
+                    <QuickLine label="Start Date" value={detailModal.item.startDate || "-"} />
+                    <QuickLine label="End Date" value={detailModal.item.endDate || "-"} />
+                    <QuickLine label="Quantity" value={`${detailModal.item.quantity || 0}`} />
+                    <QuickLine label="Refills" value={`${detailModal.item.refills || 0}`} />
+                  </div>
+                  <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                    <p className="text-sm font-medium text-slate-900">Directions for Use</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{detailModal.item.directionsForUse || "No directions provided."}</p>
+                  </div>
+                  <div className="rounded-[12px] border border-[#E5E7EB] p-4">
+                    <p className="text-sm font-medium text-slate-900">Medicines</p>
+                    <div className="mt-3 space-y-3">
+                      {detailModal.item.medicines.length === 0 ? (
+                        <p className="text-sm text-slate-500">No medicines listed.</p>
+                      ) : detailModal.item.medicines.map((medicine) => (
+                        <div key={medicine.medicineId} className="rounded-[12px] bg-[#F8FAFC] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="font-medium text-slate-900">{medicine.medicineName}</p>
+                            <Badge tone="neutral">{medicine.status || "Unknown"}</Badge>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{medicine.prescribedDosage} • Qty {medicine.prescribedQuantity}</p>
+                          <p className="mt-1 text-xs text-slate-500">Unit Price: {medicine.unitPrice} • Total: {medicine.totalPrice}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      , document.body) : null}
     </div>
   );
 }

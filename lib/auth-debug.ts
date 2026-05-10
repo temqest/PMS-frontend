@@ -9,7 +9,7 @@ type AuthDebugEntry = {
 
 const STORAGE_KEY = "pms_auth_debug_log";
 const MAX_ENTRIES = 200;
-const DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG_AUTH !== "false";
+const DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG_AUTH === "true";
 
 function readEntries(): AuthDebugEntry[] {
   try {
