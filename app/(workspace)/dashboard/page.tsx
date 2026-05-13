@@ -73,6 +73,14 @@ const isWithinLastDays = (value: Date, days: number, anchor: Date) => {
   return value.getTime() >= rangeStart.getTime() && value.getTime() <= anchor.getTime();
 };
 
+const toAppointmentDate = (item: UiAppointment) => {
+  const parsed = item.scheduledAtIso ? new Date(item.scheduledAtIso) : new Date(`${item.date}T${item.time}:00`);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  const fallback = new Date(`${item.date}T${item.time}:00`);
+  return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback;
+};
+
 const recordSummary = (record: RecordForm) => {
   if (record.recordType === "Visit") return record.visitAssessment || record.visitReason;
   if (record.recordType === "Lab Result") return record.labNotes;
@@ -120,7 +128,7 @@ export default function DashboardPage() {
     try {
       const [patientResp, appointmentResp, recordResp, providerResp] = await Promise.all([
         getPatients("?limit=200"),
-        getAppointments({ limit: 200 }),
+        getAppointments({ limit: 1000 }),
         getHealthRecords({ limit: 200 }),
         getHealthRecordProviders(),
       ]);
@@ -166,13 +174,16 @@ export default function DashboardPage() {
   }, [loadDashboardData]);
 
   const today = new Date();
+  const todayStart = startOfDay(today);
+  const todayEnd = new Date(todayStart);
+  todayEnd.setDate(todayEnd.getDate() + 1);
+  todayEnd.setMilliseconds(todayEnd.getMilliseconds() - 1);
+
   const todayAppointments = appointments
-    .filter((item) => isSameDay(new Date(`${item.date}T${item.time}:00`), today))
-    .sort(
-      (a, b) =>
-        new Date(`${a.date}T${a.time}:00`).getTime() -
-        new Date(`${b.date}T${b.time}:00`).getTime()
-    );
+    .map((item) => ({ item, date: toAppointmentDate(item) }))
+    .filter(({ date }) => date.getTime() >= todayStart.getTime() && date.getTime() <= todayEnd.getTime())
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map(({ item }) => item);
   const activePrescriptionCount = records.filter((item) => {
     if (item.recordType !== "Prescription" || item.saveState !== "final") return false;
 
